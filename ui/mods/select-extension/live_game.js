@@ -385,90 +385,84 @@
 			}));
 		});
 	}
+	// var isFactory = unitTypeMatch("Factory -Nuke -Defense -PlanetEngine");
 	var factory_queues = [
 		{
 			"name": "Air Factory",
 			"spec_id": "/pa/units/air/air_factory/air_factory.json",
 			"similarFactories": ["Air Factory", "Advanced Air Factory"],
-			"lastCopiedTime": 0,
 		},
 		{
 			"name": "Advanced Air Factory",
 			"spec_id": "/pa/units/air/air_factory_adv/air_factory_adv.json",
 			"similarFactories": ["Advanced Air Factory", "Air Factory"],
-			"lastCopiedTime": 0,
 		},
 		{
 			"name": "Bot Factory",
 			"spec_id": "/pa/units/land/bot_factory/bot_factory.json",
 			"similarFactories": ["Bot Factory", "Advanced Bot Factory", "Unit Cannon"],
-			"lastCopiedTime": 0,
 		},
 		{
 			"name": "Advanced Bot Factory",
 			"spec_id": "/pa/units/land/bot_factory_adv/bot_factory_adv.json",
 			"similarFactories": ["Advanced Bot Factory", "Bot Factory", "Unit Cannon"],
-			"lastCopiedTime": 0,
 		},
 		{
 			"name": "Vehicle Factory",
 			"spec_id": "/pa/units/land/vehicle_factory/vehicle_factory.json",
 			"similarFactories": ["Vehicle Factory", "Advanced Vehicle Factory", "Unit Cannon"],
-			"lastCopiedTime": 0,
 		},
 		{
 			"name": "Advanced Vehicle Factory",
 			"spec_id": "/pa/units/land/vehicle_factory_adv/vehicle_factory_adv.json",
 			"similarFactories": ["Advanced Vehicle Factory", "Vehicle Factory", "Unit Cannon"],
-			"lastCopiedTime": 0,
 		},
 		{
 			"name": "Naval Factory",
 			"spec_id": "/pa/units/sea/naval_factory/naval_factory.json",
 			"similarFactories": ["Naval Factory", "Advanced Naval Factory"],
-			"lastCopiedTime": 0,
 		},
 		{
 			"name": "Advanced Naval Factory",
 			"spec_id": "/pa/units/sea/naval_factory_adv/naval_factory_adv.json",
 			"similarFactories": ["Advanced Naval Factory", "Naval Factory"],
-			"lastCopiedTime": 0,
 		},
 		{
 			"name": "Orbital Launcher",
 			"spec_id": "/pa/units/orbital/orbital_launcher/orbital_launcher.json",
 			"similarFactories": ["Orbital Launcher", "Orbital Factory"],
-			"lastCopiedTime": 0,
 		},
 		{
 			"name": "Orbital Factory",
 			"spec_id": "/pa/units/orbital/orbital_factory/orbital_factory.json",
 			"similarFactories": ["Orbital Factory", "Orbital Launcher"],
-			"lastCopiedTime": 0,
 		},
 		{
 			"name": "Unit Cannon",
 			"spec_id": "/pa/units/land/avatar_factory/avatar_factory.json",
 			"similarFactories": ["Unit Cannon", "Advanced Vehicle Factory", "Vehicle Factory", "Advanced Bot Factory", "Bot Factory"],
-			"lastCopiedTime": 0,
 		},
-		// {
-		// 	"name": "Avatar Factory",
-		// 	"spec_id": "/pa/units/land/avatar_factory/avatar_factory.json"
-		// },
+		{
+			"name": "Avatar Factory",
+			"spec_id": "/pa/units/land/avatar_factory/avatar_factory.json",
+			"similarFactories": ["Advanced Naval Factory", "Naval Factory", "Orbital Launcher", "Orbital Factory", "Air Factory", "Advanced Air Factory", "Unit Cannon", "Advanced Vehicle Factory", "Vehicle Factory", "Advanced Bot Factory", "Bot Factory"],
+		},
 	];
 	var factory_spec_ids = {};
+	var specSuffix = Object.keys(model.unitSpecs).some(function (key) { return key.endsWith(".player") }) ? ".player" : "";
 	factory_queues.forEach(function (factory_queue) {
-		factory_spec_ids[factory_queue.spec_id] = null
+		if (specSuffix) factory_queue.spec_id += specSuffix;
+		factory_spec_ids[factory_queue.spec_id] = null;
 		factory_queue.similarFactories = factory_queue.similarFactories.map(function(factoryName) {
-			return factory_queues.find(function(factory) { return factory.name === factoryName })
-		})
+			return factory_queues.find(function(factory) { return factory.name === factoryName });
+		});
+		factory_queue.lastCopiedTime = 0;
 	});
 	model.copy_factory_queue = function() {
 		var message = "Select a factory to copy its queue";
 		var selection = getSelectionOrHover(message);
-		if (!selection) return
-		if (!factoriesInSelection(selection, message)) return
+		if (!selection) return;
+		if (!factoriesInSelection(selection, message)) return;
 		var armyIndex = model.armyIndex();
 		var worldView = api.getWorldView(0);
 		factory_queues.forEach(function (factory_queue) { // pętla po typach fabryk
@@ -597,7 +591,7 @@
 	function unitTypeMatch(typeExpression) {
 		var orArr = typeExpression.split("|").filter(Boolean).map(function (andArr) {
 			return andArr.split(" ").filter(Boolean).map(function (unitType) {
-				return [unitType.trim().replace(/\W+/g, "").toTitleCase(), unitType.trim().startsWith("-") ? undefined : true]
+				return [unitType.trim().replace(/\W+/g, ""), unitType.trim().startsWith("-") ? undefined : true]
 			});
 		});
 
@@ -643,7 +637,7 @@
 			_.unique(
 				_.values(model.unitSpecs)
 				.filter(unitTypeMatch(typeExpression))
-				.map(function(unitSpec) { return unitSpec.unit_name.replace("!LOC:", "") })
+				.map(function(unitSpec) { return unitSpec.name.replace("!LOC:", "") })
 			).sortValuesSimple().join("\n")
 		);
 	}
