@@ -55,6 +55,14 @@
 			location: {x: locArr[0], y: locArr[1], z: locArr[2]} // , lat: 152.76652370095897, long: 0.3689341171248849
 		}, 1);
 	}
+	function toId(elem) {
+		return elem.id;
+	}
+	function getProp(value) {
+		return function (elem) {
+			return elem[value];
+		};
+	}
 	var oldHover = handlers.hover;
 	var lastHoverPayload;
 	handlers.hover = function(payload) {
@@ -266,16 +274,6 @@
 			}
 		});
 	}
-	// function getArmyUnitStates(filterFun, planetIndex, armyIndex) {
-	// 	return getArmyUnitIds(filterFun, planetIndex, armyIndex).then(function (unitIds) {
-	// 		return api.getWorldView(0).getUnitState(unitIds).then(function (unitStates) {
-	// 			unitStates.forEach(function (unitState, i) {
-	// 				unitState.id = unitIds[i];
-	// 			});
-	// 			return unitStates;
-	// 		});
-	// 	});
-	// }
 	function getArmyUnitStates(filterFun, planetIndex, armyIndex) {
 		return new Promise(function (resolve) {
 			getArmyUnitIds(filterFun, planetIndex, armyIndex).then(function (unitIds) {
@@ -309,26 +307,18 @@
 			return unitStates;
 		});
 	}
-	function toId(elem) {
-		return elem.id;
-	}
-	function getProp(value) {
-		return function (elem) {
-			return elem[value];
-		};
-	}
 	function getSelectionOrHover(additionalMessage) {
 		var selection = model.selection();
 		if (!selection) {
-			logChatMessage("Nothing is selected" + (additionalMessage ? ". " + additionalMessage : ""))
+			logChatMessage("Nothing is selected" + (additionalMessage ? ". " + additionalMessage : ""));
 			return;
 			if (lastHoverPayload.entity) {
-				selection = {}
-				selection[lastHoverPayload.spec_id] = [lastHoverPayload.entity]
+				selection = {};
+				selection[lastHoverPayload.spec_id] = [lastHoverPayload.entity];
 				selection = {spec_ids: selection};
 				// mySelect.unitsById([lastHoverPayload.entity]);
 			} else {
-				logChatMessage("Nothing is selected or hovered over" + (additionalMessage ? ". " + additionalMessage : ""))
+				logChatMessage("Nothing is selected or hovered over" + (additionalMessage ? ". " + additionalMessage : ""));
 				return;
 			}
 		}
@@ -556,6 +546,53 @@
 			}).filter(Boolean).join(" | ")
 			|| "No queue was copied"
 		);
+	}
+	model.print_selected_factory_queue_to_chat = function() {
+		var selection = getSelectionOrHover();
+		if (!selection) return;
+		return api.getWorldView(0).getUnitState(_.flatten(_.toArray(selection.spec_ids))).then(function (unitStates) {
+			for (var unitState of unitStates) {
+				if (_.isArray(unitState.build)) {
+					var agregatedUnits = {}
+					unitState.build.forEach(function (buildUnit) {
+						var count = agregatedUnits[buildUnit.spec] || 0;
+						agregatedUnits[buildUnit.spec] = buildUnit.count + count;
+					});
+					logChatMessage(
+						model.unitSpecs[unitState.unit_spec].unit_name.replace("!LOC:","") + ": " + Object.keys(agregatedUnits).sortValuesSimple().map(function (key) {
+							var unitSpec = model.unitSpecs[key];
+							var count = agregatedUnits[key];
+							return count + "*" + unitSpec.unit_name.replace("!LOC:", "");
+						}).join(", ")
+					);
+					return;
+				}
+			}
+			logChatMessage("No factory is selected or selected factories have no queue");
+		});
+	}
+	model.print_selected_factory_queue_with_spec_ids_to_chat = function() {
+		var selection = getSelectionOrHover();
+		if (!selection) return;
+		return api.getWorldView(0).getUnitState(_.flatten(_.toArray(selection.spec_ids))).then(function (unitStates) {
+			for (var unitState of unitStates) {
+				if (_.isArray(unitState.build)) {
+					var agregatedUnits = {}
+					unitState.build.forEach(function (buildUnit) {
+						var count = agregatedUnits[buildUnit.spec] || 0;
+						agregatedUnits[buildUnit.spec] = buildUnit.count + count;
+					});
+					logChatMessage(
+						unitState.unit_spec.replace("/pa/units/","") + ": " + Object.keys(agregatedUnits).sortValuesSimple().map(function (key) {
+							var count = agregatedUnits[key];
+							return count + "*" + key.replace("/pa/units/", "");
+						}).join(", ")
+					);
+					return;
+				}
+			}
+			logChatMessage("No factory is selected or selected factories have no queue");
+		});
 	}
 
 	// =================   Locate units   ====================

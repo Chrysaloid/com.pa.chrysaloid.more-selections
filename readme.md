@@ -17,6 +17,8 @@ Unpack zip into `%localappdata%\Uber Entertainment\Planetary Annihilation\client
 - Paste factory queue strict  - Paste copied queue. Factory types are matched strictly so i.e. Bot Factory queue will not be pasted to Advanced Bot Factory.
 - Paste factory queue unified - Paste copied queue. Factory types are matched loosely  so i.e. Bot Factory queue will be pasted to Advanced Bot Factory and vice versa. Unit Cannon will accept Bot and Vehicle queues. The queues of similar factories are sorted by time of copying (newest first) so whatever similar factory you have copies last it will be pasted.
 - Print saved factory queue to chat - The output might be VERY long so be advised.
+- Print selected factory queue to chat - Print queue of the first selected factory. Note: the unit currently being built is added to the number of queued units in the UI but but the print reflects the real queue. (default keybind: ctrl+f8)
+- Print selected factory queue to chat - Same as above but instead of converting `spec_id` fields to friendly names print them raw* (almost raw: the ubiquitous `"/pa/units/"` is removed from the front of the `spec_id` to make the print more concise). This is mostly for debug purposes, but I left it for the curious ones. (default keybind: ctrl+f9)
 
 Hold SHIFT to not replace existing queue and instead add the copied queue to the existing one. To clear queue for a factory type, simply copy a factory that has no queue. If you have copied an empty queue (or not copied one at all) and if you paste the queue it will just clear the current queue (like executing STOP order but without canceling current build).
 

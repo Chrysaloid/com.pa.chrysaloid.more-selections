@@ -80,6 +80,8 @@
 	keyBind("paste_factory_queue_strict");
 	keyBind("paste_factory_queue_unified");
 	keyBind("print_saved_factory_queue_to_chat");
+	keyBind("print_selected_factory_queue_to_chat", "ctrl+f8");
+	keyBind("print_selected_factory_queue_with_spec_ids_to_chat", "ctrl+f9");
 
 	display_sub_group = "Locate units";
 	keyBind("ping_last_known_enemy_commanders_positions");

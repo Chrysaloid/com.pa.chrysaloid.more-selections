@@ -1,0 +1,27 @@
+{
+	"planet": 0,
+	"build": [
+		{
+			"spec": "/pa/units/air/bomber/bomber.json",
+			"count": 3
+		},
+		{
+			"spec": "/pa/units/air/fighter/fighter.json",
+			"count": 1
+		}
+	],
+	"unit_spec": "/pa/units/air/air_factory/air_factory.json",
+	"pos": [
+		-30.412988662719727,
+		-8.348495483398438,
+		-350.0343017578125
+	],
+	"army": 0,
+	"orient": [
+		0.03718920052051544,
+		-0.998872697353363,
+		-1.4103408718657562e-10,
+		0.029505113139748573
+	],
+	"build_target": 4184
+}
