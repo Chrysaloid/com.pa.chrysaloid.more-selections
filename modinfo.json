@@ -8,6 +8,7 @@
 	"display_name": "MORE SELECTIONS!",
 	"forum"       : "none",
 	"icon"        : "https://raw.githubusercontent.com/Chrysaloid/com.pa.chrysaloid.more-selections/main/icon.png",
+	"github"      : "https://github.com/Chrysaloid/com.pa.chrysaloid.more-selections",
 	"identifier"  : "com.pa.chrysaloid.more-selections",
 	"priority"    : 100,
 	"scenes"      : { "global_mod_list": ["coui://ui/mods/more-selections/keybinds.js"], "live_game": ["coui://ui/mods/more-selections/live_game.js"] },
