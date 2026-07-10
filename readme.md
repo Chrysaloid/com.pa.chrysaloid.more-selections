@@ -13,7 +13,7 @@ Some selections (like "Select all fabbers") for some reason don't work after you
 Unpack zip into `%localappdata%\Uber Entertainment\Planetary Annihilation\client_mods\`. `modinfo.json` should have path `%localappdata%\Uber Entertainment\Planetary Annihilation\client_mods\com.pa.chrysaloid.select-extension\modinfo.json`
 
 # Factory managment
-- Copy factory queue - Copies queue of the selected factories. Does not use system clipboard - the queues are just saved in mod memory (they are lost after going back to menu). Each factory type is copied separately. If multiple factories of the same type are selected, queue of the first factory that was selected will be copied.
+- Copy factory queue - Copies queue of the selected factories. Does not use system clipboard - the queues are saved in mod memory and backed up on disk using localStorage. Each factory type is copied separately. If multiple factories of the same type are selected, queue of the first factory that was selected will be copied.
 - Paste factory queue strict  - Paste copied queue. Factory types are matched strictly so i.e. Bot Factory queue will not be pasted to Advanced Bot Factory.
 - Paste factory queue unified - Paste copied queue. Factory types are matched loosely  so i.e. Bot Factory queue will be pasted to Advanced Bot Factory and vice versa. Unit Cannon will accept Bot and Vehicle queues. The queues of similar factories are sorted by time of copying (newest first) so whatever similar factory you have copies last it will be pasted.
 - Print saved factory queue to chat - The output might be VERY long so be advised.

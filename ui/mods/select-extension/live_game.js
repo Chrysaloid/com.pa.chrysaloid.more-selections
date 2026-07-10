@@ -335,7 +335,7 @@
 		return selection;
 	}
 	function factoriesInSelection(selection, additionalMessage) {
-		if (Object.keys(selection.spec_ids).some(function (spec_id) { return factory_spec_ids.hasOwnProperty(spec_id) })) {
+		if (Object.keys(selection.spec_ids).some(function (spec_id) { return factory_spec_ids[spec_id] })) {
 			return true;
 		} else {
 			logChatMessage("There are no factories in selection" + (additionalMessage ? ". " + additionalMessage : ""))
@@ -449,14 +449,41 @@
 		},
 	];
 	var factory_spec_ids = {};
-	var specSuffix = Object.keys(model.unitSpecs).some(function (key) { return key.endsWith(".player") }) ? ".player" : "";
-	factory_queues.forEach(function (factory_queue) {
-		if (specSuffix) factory_queue.spec_id += specSuffix;
-		factory_spec_ids[factory_queue.spec_id] = null;
-		factory_queue.similarFactories = factory_queue.similarFactories.map(function(factoryName) {
-			return factory_queues.find(function(factory) { return factory.name === factoryName });
+	var factoryQueueStoreKey = "chrysaloid.factoryQueuesStore";
+	var specSuffix;
+	function normalizeSpecs(buildObj) {
+		var normalized = {};
+		Object.keys(buildObj).forEach(function (key) {
+			normalized[key.replace(/\.ai$|\.player$/gm, "")] = buildObj[key];
 		});
-		factory_queue.lastCopiedTime = 0;
+		return normalized;
+	}
+	function denormalizeSpecs(buildObj) {
+		var denormalized = {};
+		Object.keys(buildObj).forEach(function (key) {
+			denormalized[key + specSuffix] = buildObj[key];
+		});
+		return denormalized;
+	}
+	sleep(200).then(function() { // delay isnenecessary here because at this time model.unitSpecs is undefined
+		specSuffix = Object.keys(model.unitSpecs).some(function (key) { return key.endsWith(".player") }) ? ".player" : "";
+		var factoryQueuesStore = JSON.parse(localStorage.getItem(factoryQueueStoreKey) || "{}");
+		factory_queues.forEach(function (factory_queue) {
+			factory_queue.build = factoryQueuesStore[factory_queue.name];
+			if (specSuffix) {
+				factory_queue.spec_id += specSuffix;
+				if (factory_queue.build) {
+					factory_queue.build.forEach(function (buildUnit) {
+						buildUnit.spec += specSuffix;
+					});
+				}
+			}
+			factory_spec_ids[factory_queue.spec_id] = true;
+			factory_queue.similarFactories = factory_queue.similarFactories.map(function(factoryName) {
+				return factory_queues.find(function(factory) { return factory.name === factoryName });
+			});
+			factory_queue.lastCopiedTime = 0;
+		});
 	});
 	model.copy_factory_queue = function() {
 		var message = "Select a factory to copy its queue";
@@ -465,15 +492,23 @@
 		if (!factoriesInSelection(selection, message)) return;
 		var armyIndex = model.armyIndex();
 		var worldView = api.getWorldView(0);
-		factory_queues.forEach(function (factory_queue) { // pętla po typach fabryk
+		return Promise.all(factory_queues.map(function (factory_queue) { // pętla po typach fabryk
 			var unitArr = selection.spec_ids[factory_queue.spec_id];
 			if (!unitArr) return;
-			worldView.getUnitState(unitArr[0]).then(function (unit) {
-				if (!_.isArray(unit.build)) unit.build = false;
+			return worldView.getUnitState(unitArr[0]).then(function (unit) {
 				if (unit.army !== armyIndex) return;
-				factory_queue.build = unit.build;
+				factory_queue.build = _.isArray(unit.build) ? unit.build : false;
 				factory_queue.lastCopiedTime = performance.now();
 			});
+		})).then(function () {
+			var factoryQueuesStore = {};
+			factory_queues.forEach(function (factory_queue) { // pętla po typach fabryk
+				if (!factory_queue.build) return;
+				factoryQueuesStore[factory_queue.name] = specSuffix ? factory_queue.build.map(function (buildUnit) {
+					return { spec: buildUnit.spec.replace(/\.ai$|\.player$/gm, ""), count: buildUnit.count };
+				}) : factory_queue.build;
+			});
+			localStorage.setItem(factoryQueueStoreKey, JSON.stringify(factoryQueuesStore));
 		});
 	}
 	var pasteMessage = "Select a factory to paste the copied queue";
