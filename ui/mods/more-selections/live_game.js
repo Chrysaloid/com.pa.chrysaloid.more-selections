@@ -451,20 +451,6 @@
 	var factory_spec_ids = {};
 	var factoryQueueStoreKey = "chrysaloid.factoryQueuesStore";
 	var specSuffix;
-	function normalizeSpecs(buildObj) {
-		var normalized = {};
-		Object.keys(buildObj).forEach(function (key) {
-			normalized[key.replace(/\.ai$|\.player$/gm, "")] = buildObj[key];
-		});
-		return normalized;
-	}
-	function denormalizeSpecs(buildObj) {
-		var denormalized = {};
-		Object.keys(buildObj).forEach(function (key) {
-			denormalized[key + specSuffix] = buildObj[key];
-		});
-		return denormalized;
-	}
 	sleep(200).then(function() { // delay isnenecessary here because at this time model.unitSpecs is undefined
 		specSuffix = Object.keys(model.unitSpecs).some(function (key) { return key.endsWith(".player") }) ? ".player" : "";
 		var factoryQueuesStore = JSON.parse(localStorage.getItem(factoryQueueStoreKey) || "{}");

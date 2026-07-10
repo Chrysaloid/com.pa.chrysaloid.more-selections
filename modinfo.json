@@ -3,7 +3,7 @@
 	"build"       : "115280",
 	"category"    : ["settings", "titans", "ui", "select", "selection", "keybind", "closest", "radar", "coverage", "single", "queue", "factory"],
 	"context"     : "client",
-	"date"        : "2026-07-07",
+	"date"        : "2026-07-10",
 	"description" : "Adds many useful selection keybinds especially selection of N closest units of various types as well as keybinds to copy factory queues between factories. Based on Select Extension by D1rtySanchez.",
 	"display_name": "MORE SELECTIONS!",
 	"forum"       : "none",
