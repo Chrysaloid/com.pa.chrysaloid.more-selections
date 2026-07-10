@@ -1,16 +1,16 @@
 {
 	"author"      : "Chrysaloid",
 	"build"       : "115280",
-	"category"    : ["settings", "titans", "ui", "select", "selection", "extension", "keybind", "closest", "radar", "coverage", "single"],
+	"category"    : ["settings", "titans", "ui", "select", "selection", "keybind", "closest", "radar", "coverage", "single", "queue", "factory"],
 	"context"     : "client",
 	"date"        : "2026-07-07",
 	"description" : "Adds many useful selection keybinds especially selection of N closest units of various types as well as keybinds to copy factory queues between factories. Based on Select Extension by D1rtySanchez.",
 	"display_name": "MORE SELECTIONS!",
 	"forum"       : "none",
 	"icon"        : "https://raw.githubusercontent.com/Chrysaloid/JS-plus-CSS-Injector/main/resources/Selection-icon-vectorized-square.png",
-	"identifier"  : "com.pa.chrysaloid.select-extension",
+	"identifier"  : "com.pa.chrysaloid.more-selections",
 	"priority"    : 100,
-	"scenes"      : { "global_mod_list": ["coui://ui/mods/select-extension/keybinds.js"], "live_game": ["coui://ui/mods/select-extension/live_game.js"] },
+	"scenes"      : { "global_mod_list": ["coui://ui/mods/more-selections/keybinds.js"], "live_game": ["coui://ui/mods/more-selections/live_game.js"] },
 	"signature"   : "not yet implemented",
 	"version"     : "1.0.0"
 }
