@@ -63,6 +63,11 @@
 			return elem[value];
 		};
 	}
+	function callProp(value, arg) {
+		return function (elem) {
+			return elem[value](arg);
+		};
+	}
 	var oldHover = handlers.hover;
 	var lastHoverPayload;
 	handlers.hover = function(payload) {
@@ -134,7 +139,7 @@
 	});
 
 	model.currentFocusPlanetId = function() {
-		return api.camera.getFocus(api.Holodeck.focused.id).planetId()
+		return api.camera.getFocus(api.Holodeck.focused.id).planet()
 	}
 
 	var distance2d = function(p1x, p1y, p2x, p2y) {
@@ -357,6 +362,17 @@
 		}
 
 		return next();
+	}
+	function getMountedMods() {
+		return api.mods.getMounted("client").then(function(mods) {
+			mods = mods.map(function (mod) {return mod.display_name});
+			console.log(mods.sortValuesSimple().join("\n"));
+			return mods;
+		});
+	}
+	function shouldGetOrbitalFabbers() {
+		var zoomLevel = api.camera.getFocus(api.Holodeck.focused.id).zoomLevel();
+		return zoomLevel === "orbital" || zoomLevel === "celestial";
 	}
 
 	// =================   Factory managment  ====================
@@ -644,8 +660,8 @@
 
 	// =================   Select closest   ====================
 
-	var hasOrders = function(unitState) { return unitState.orders };
-	var hasNoOrders = function(unitState) { return !unitState.orders };
+	var hasOrders = function(unitState) { return unitState.orders && !unitState.parent }; // && !unitState.parent filters out units that are currently being built
+	var hasNoOrders = function(unitState) { return !unitState.orders && !unitState.parent };
 	function unitTypeMatch(typeExpression) {
 		var orArr = typeExpression.split("|").filter(Boolean).map(function (andArr) {
 			return andArr.split(" ").filter(Boolean).map(function (unitType) {
@@ -700,38 +716,32 @@
 		);
 	}
 	var closestCountMax = 14;
-	function selectNClosestEntities(N, filterFun) {
-		return getUnitsSortedByDistanceToCamera(filterFun).then(function (unitStates) {
+	function selectNClosestEntities(N, specFilterFun, specFilterEncapsulated, stateFilterFun) {
+		return getUnitsSortedByDistanceToCamera(specFilterEncapsulated ? specFilterFun() : specFilterFun).then(function (unitStates) {
+			if (stateFilterFun) unitStates = unitStates.filter(stateFilterFun);
 			mySelect.unitsById(unitStates.map(toId).slice(0,N));
 			return unitStates;
 		});
 	}
 	// var isCombat = function (unitSpec) { return unitSpec.shortTypes["Mobile"] && !unitSpec.shortTypes["Fabber"] };
 	var isCombat = unitTypeMatch("Mobile -Fabber -Commander");
-	for (var i = 1; i <= closestCountMax; i++) model["select_" + i + "_closest_combat_units"] = selectNClosestEntities.bind(null, i, isCombat);
+	for (var i = 1; i <= closestCountMax; i++) model["select_" + i + "_closest_combat_units"] = selectNClosestEntities.bind(null, i, isCombat, false, null); // model.select_1_closest_combat_units()
 
 	var isFactory = unitTypeMatch("Factory");
-	for (var i = 1; i <= closestCountMax; i++) model["select_" + i + "_closest_factories"] = selectNClosestEntities.bind(null, i, isFactory);
+	for (var i = 1; i <= closestCountMax; i++) model["select_" + i + "_closest_factories"] = selectNClosestEntities.bind(null, i, isFactory, false, null); // model.select_1_closest_factories()
 
 	var isNonOrbitalFabber = unitTypeMatch("Fabber -Orbital");
 	var isOrbitalFabber = unitTypeMatch("Fabber Orbital");
-	function selectNClosestFabbers(N) {
-		var zoomLevel = api.camera.getFocus(api.Holodeck.focused.id).zoomLevel();
-		return getUnitsSortedByDistanceToCamera(zoomLevel === "orbital" || zoomLevel === "celestial" ? isOrbitalFabber : isNonOrbitalFabber).then(function (unitStates) {
-			mySelect.unitsById(unitStates.map(toId).slice(0,N));
-			return unitStates;
-		});
-	}
-	for (var i = 1; i <= closestCountMax; i++) model["select_" + i + "_closest_fabbers"] = selectNClosestFabbers.bind(null, i);
+	var fabberFilter = function () { return shouldGetOrbitalFabbers() ? isOrbitalFabber : isNonOrbitalFabber }
+	for (var i = 1; i <= closestCountMax; i++) model["select_" + i + "_closest_fabbers"] = selectNClosestEntities.bind(null, i, fabberFilter, true, null); // model.select_1_closest_fabbers()
 
-	function selectNClosestIdleFabbers(N) {
-		var zoomLevel = api.camera.getFocus(api.Holodeck.focused.id).zoomLevel();
-		return getUnitsSortedByDistanceToCamera(zoomLevel === "orbital" || zoomLevel === "celestial" ? isOrbitalFabber : isNonOrbitalFabber).then(function (unitStates) {
-			mySelect.unitsById(unitStates.filter(hasNoOrders).map(toId).slice(0,N));
-			return unitStates;
-		});
-	}
-	for (var i = 1; i <= closestCountMax; i++) model["select_" + i + "_closest_idle_fabbers"] = selectNClosestIdleFabbers.bind(null, i);
+	for (var i = 1; i <= closestCountMax; i++) model["select_" + i + "_closest_idle_fabbers"] = selectNClosestEntities.bind(null, i, fabberFilter, true, hasNoOrders); // model.select_1_closest_idle_fabbers()
+
+	var isAstraeus = function (unitSpec) { return unitSpec.name === "Astraeus" };
+	for (var i = 1; i <= closestCountMax; i++) model["select_" + i + "_closest_idle_astraeuses"] = selectNClosestEntities.bind(null, i, isAstraeus, false, hasNoOrders); // model.select_1_closest_idle_fabbers()
+
+	var isPelican = function (unitSpec) { return unitSpec.name === "Pelican" };
+	for (var i = 1; i <= closestCountMax; i++) model["select_" + i + "_closest_idle_pelicans"] = selectNClosestEntities.bind(null, i, isPelican, false, hasNoOrders); // model.select_1_closest_idle_fabbers()
 
 	// =================   Miscellaneous selections  ====================
 
@@ -751,20 +761,18 @@
 		}
 	}
 	model.select_all_fabbers = function() {
-		var zoomLevel = api.camera.getFocus(api.Holodeck.focused.id).zoomLevel();
-		if (zoomLevel !== "orbital" && zoomLevel !== "celestial") {
-			return mySelect.unitsOnPlanet(model.currentFocusPlanetId(), "Fabber", "Orbital");
-		} else {
+		if (shouldGetOrbitalFabbers()) {
 			return mySelect.unitsOnPlanet(model.currentFocusPlanetId(), ["Fabber", "Orbital"]);
+		} else {
+			return mySelect.unitsOnPlanet(model.currentFocusPlanetId(), "Fabber", "Orbital");
 		}
 	}
 	// Note this is global, whereas the default select fabbers is on screen only
 	model.select_all_idle_fabbers = function() {
-		var zoomLevel = api.camera.getFocus(api.Holodeck.focused.id).zoomLevel();
-		if (zoomLevel !== "orbital" && zoomLevel !== "celestial") {
-			return mySelect.idleFabbers(model.currentFocusPlanetId(), null, "Orbital");
-		} else {
+		if (shouldGetOrbitalFabbers()) {
 			return mySelect.idleFabbers(model.currentFocusPlanetId(), "Orbital");
+		} else {
+			return mySelect.idleFabbers(model.currentFocusPlanetId(), null, "Orbital");
 		}
 	}
 	model.select_all_scouts = function() {

@@ -111,6 +111,8 @@
 		"idle_fabbers",
 		"fabbers",
 		"factories",
+		"idle_astraeuses",
+		"idle_pelicans",
 		"combat_units",
 	]) {
 		display_sub_group = "Selection - closest " + group.replace(/_/g, " ");
