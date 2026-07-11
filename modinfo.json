@@ -6,7 +6,6 @@
 	"date"        : "2026-07-10",
 	"description" : "Adds many useful selection keybinds especially selection of N closest units of various types as well as keybinds to copy factory queues between factories. Based on Select Extension by D1rtySanchez.",
 	"display_name": "MORE SELECTIONS!",
-	"forum"       : "none",
 	"icon"        : "https://raw.githubusercontent.com/Chrysaloid/com.pa.chrysaloid.more-selections/main/icon.png",
 	"github"      : "https://github.com/Chrysaloid/com.pa.chrysaloid.more-selections",
 	"identifier"  : "com.pa.chrysaloid.more-selections",
