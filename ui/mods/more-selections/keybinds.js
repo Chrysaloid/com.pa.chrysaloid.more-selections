@@ -55,41 +55,41 @@
 			});
 		}, Promise.resolve());
 	});
-	expandPrototype(Array, "min", function (getter) {
+	expandPrototype(Array, "min", function (getValue) {
 		var len = this.length;
 		if (!len) return null;
-		if (!getter) getter = identity;
-		var val = getter(this[0]);
+		if (!getValue) getValue = identity;
+		var val = getValue(this[0]);
 		for (var i = 1; i < len; i++) {
-			var newVal = getter(this[i]);
+			var newVal = getValue(this[i]);
 			if (val > newVal) {
 				val = newVal;
 			}
 		}
 		return val;
 	});
-	expandPrototype(Array, "max", function (getter) {
+	expandPrototype(Array, "max", function (getValue) {
 		var len = this.length;
 		if (!len) return null;
-		if (!getter) getter = identity;
-		var val = getter(this[0]);
+		if (!getValue) getValue = identity;
+		var val = getValue(this[0]);
 		for (var i = 1; i < len; i++) {
-			var newVal = getter(this[i]);
+			var newVal = getValue(this[i]);
 			if (val < newVal) {
 				val = newVal;
 			}
 		}
 		return val;
 	});
-	expandPrototype(Array, "minElem", function (getter) {
+	expandPrototype(Array, "minElem", function (getValue) {
 		var len = this.length;
 		if (!len) return null;
-		if (!getter) getter = identity;
+		if (!getValue) getValue = identity;
 		var el = this[0];
-		var val = getter(el);
+		var val = getValue(el);
 		for (var i = 1; i < len; i++) {
 			var newEl = this[i];
-			var newVal = getter(newEl);
+			var newVal = getValue(newEl);
 			if (val > newVal) {
 				val = newVal;
 				el = newEl;
@@ -97,15 +97,15 @@
 		}
 		return el;
 	});
-	expandPrototype(Array, "maxElem", function (getter) {
+	expandPrototype(Array, "maxElem", function (getValue) {
 		var len = this.length;
 		if (!len) return null;
-		if (!getter) getter = identity;
+		if (!getValue) getValue = identity;
 		var el = this[0];
-		var val = getter(el);
+		var val = getValue(el);
 		for (var i = 1; i < len; i++) {
 			var newEl = this[i];
-			var newVal = getter(newEl);
+			var newVal = getValue(newEl);
 			if (val < newVal) {
 				val = newVal;
 				el = newEl;
@@ -164,7 +164,7 @@
 	keyBind("select_all_idle_fabbers");
 	keyBind("select_all_scouts");
 	keyBind("select_all_idle_scouts");
-	keyBind("select_all_repair");
+	keyBind("select_all_land_and_air_repair");
 
 	display_sub_group = "Edit selection";
 	keyBind("select_closest_unit_in_selection");
@@ -172,8 +172,8 @@
 	keyBind("remove_artillery_from_selection");
 	keyBind("only_anti_air_in_selection");
 	keyBind("remove_anti_air_from_selection");
-	keyBind("only_repair_in_selection");
-	keyBind("remove_repair_from_selection");
+	keyBind("only_land_and_air_repair_in_selection");
+	keyBind("remove_land_and_air_repair_from_selection");
 
 	var closestCountMax = 15;
 	for (var group of [
