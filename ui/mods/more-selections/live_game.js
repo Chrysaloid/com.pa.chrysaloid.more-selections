@@ -160,15 +160,16 @@
 	}
 
 	function getOptionFromSelectMode(select_mode) {
-		switch (select_mode) {
-			case undefined:
-			default: return Mousetrap.isShiftDown() ? "add" : "default";
-			case "add"    :
-			case "remove" :
-			case "default": return select_mode;
+		if (select_mode) {
+			switch (select_mode) {
+				case "add"    :
+				case "remove" :
+				case "default": return select_mode;
+			}
 		}
+		return Mousetrap.isShiftDown() ? "add" : "default";
 	}
-	function callWithFilter(command, group, acceptance_filter, rejection_filter, select_mode) {
+	function callWithFilter(command, planet_id, acceptance_filter, rejection_filter, select_mode) {
 		if (!acceptance_filter) acceptance_filter = [];
 
 		if (typeof (command) !== "string") return;
@@ -181,8 +182,22 @@
 
 		if (model.endCommandMode) model.endCommandMode();
 
-		if (group === null) return engine.call(command, JSON.stringify(acceptance_filter), JSON.stringify(rejection_filter), getOptionFromSelectMode(select_mode));
-		else return engine.call(command, group, JSON.stringify(acceptance_filter), JSON.stringify(rejection_filter), getOptionFromSelectMode(select_mode));
+		if (planet_id === null) {
+			return engine.call(
+				command,
+				JSON.stringify(acceptance_filter),
+				JSON.stringify(rejection_filter),
+				getOptionFromSelectMode(select_mode)
+			);
+		} else {
+			return engine.call(
+				command,
+				planet_id === undefined ? currentFocusPlanetId() : planet_id,
+				JSON.stringify(acceptance_filter),
+				JSON.stringify(rejection_filter),
+				getOptionFromSelectMode(select_mode)
+			);
+		}
 	}
 	var mySelect = {
 		armyCommanders: function (armyId) { return engine.call("select.armyCommanders", armyId); },
@@ -227,22 +242,22 @@
 		unitsfromSelection: function (acceptance_filter, rejection_filter, select_mode) {
 			return callWithFilter("select.fromCurrentSelectionWithTypeFilter", null, acceptance_filter, rejection_filter, select_mode);
 		},
-		unitsOnScreen: function (planet_id, acceptance_filter, rejection_filter, select_mode) {
+		unitsOnScreen: function (acceptance_filter, rejection_filter, select_mode, planet_id) {
 			return callWithFilter("select.unitsOnScreenWithTypeFilter", planet_id, acceptance_filter || "Mobile", rejection_filter, select_mode);
 		},
-		unitsOnPlanet: function (planet_id, acceptance_filter, rejection_filter, select_mode) {
+		unitsOnPlanet: function (acceptance_filter, rejection_filter, select_mode, planet_id) {
 			return callWithFilter("select.unitsOnPlanetWithTypeFilter", planet_id, acceptance_filter || "Mobile", rejection_filter, select_mode);
 		},
-		idleFabbers: function (planet_id, acceptance_filter, rejection_filter, select_mode) {
+		idleFabbers: function (acceptance_filter, rejection_filter, select_mode, planet_id) {
 			return callWithFilter("select.idleFabbersWithTypeFilter", planet_id, acceptance_filter || "Fabber", rejection_filter, select_mode);
 		},
-		idleFactories: function (planet_id, acceptance_filter, rejection_filter, select_mode) {
+		idleFactories: function (acceptance_filter, rejection_filter, select_mode, planet_id) {
 			return callWithFilter("select.idleFactoriesWithTypeFilter", planet_id, acceptance_filter || "Factory", rejection_filter, select_mode);
 		},
-		idleFabbersOnScreen: function (planet_id, acceptance_filter, rejection_filter, select_mode) {
+		idleFabbersOnScreen: function (acceptance_filter, rejection_filter, select_mode, planet_id) {
 			return callWithFilter("select.idleFabbersOnScreenWithTypeFilter", planet_id, acceptance_filter || "Fabber", rejection_filter, select_mode);
 		},
-		idleFactoriesOnScreen: function (planet_id, acceptance_filter, rejection_filter, select_mode) {
+		idleFactoriesOnScreen: function (acceptance_filter, rejection_filter, select_mode, planet_id) {
 			return callWithFilter("select.idleFactoriesOnScreenWithTypeFilter", planet_id, acceptance_filter || "Factory", rejection_filter, select_mode);
 		},
 		captureGroup: api.select.captureGroup,
@@ -830,35 +845,34 @@
 	var radarType = 0;
 	model.cycle_radars = function() {
 		radarType = (radarType + 1) % 2
-		var planet_id = currentFocusPlanetId();
 		if (radarType) { // structure
-			mySelect.unitsOnPlanet(planet_id, ["Recon", "Structure"]); // Radars
-			mySelect.unitsOnPlanet(planet_id, ["NukeDefense", "Structure"], null, "add"); // Anti-nuke
-			mySelect.unitsOnPlanet(planet_id, ["Defense", "Naval", "Structure"], ["Land"], "add"); // Torpedo Launchers
+			mySelect.unitsOnPlanet(["Recon", "Structure"]); // Radars
+			mySelect.unitsOnPlanet(["NukeDefense", "Structure"], null, "add"); // Anti-nuke
+			mySelect.unitsOnPlanet(["Defense", "Naval", "Structure"], ["Land"], "add"); // Torpedo Launchers
 		} else { // mobile
-			mySelect.unitsOnPlanet(planet_id, ["Recon"], ["Structure"]); // ARKYD, Advanced Radar Satellite
-			mySelect.unitsOnPlanet(planet_id, ["Amphibious", "Heavy"], ["Structure"], "add"); // Manhattan
-			mySelect.unitsOnPlanet(planet_id, ["Radar", "RadarJammer"], ["Structure"], "add"); // Nyx
-			mySelect.unitsOnPlanet(planet_id, ["Radar", "Naval"], ["Structure"], "add"); // Stingray
+			mySelect.unitsOnPlanet(["Recon"], ["Structure"]); // ARKYD, Advanced Radar Satellite
+			mySelect.unitsOnPlanet(["Amphibious", "Heavy"], ["Structure"], "add"); // Manhattan
+			mySelect.unitsOnPlanet(["Radar", "RadarJammer"], ["Structure"], "add"); // Nyx
+			mySelect.unitsOnPlanet(["Radar", "Naval"], ["Structure"], "add"); // Stingray
 		}
 	}
 	model.select_all_fabbers = function() {
 		if (shouldGetOrbitalFabbers()) {
-			return mySelect.unitsOnPlanet(currentFocusPlanetId(), ["Fabber", "Orbital"]);
+			return mySelect.unitsOnPlanet(["Fabber", "Orbital"]);
 		} else {
-			return mySelect.unitsOnPlanet(currentFocusPlanetId(), "Fabber", "Orbital");
+			return mySelect.unitsOnPlanet("Fabber", "Orbital");
 		}
 	}
 	// Note this is global, whereas the default select fabbers is on screen only
 	model.select_all_idle_fabbers = function() {
 		if (shouldGetOrbitalFabbers()) {
-			return mySelect.idleFabbers(currentFocusPlanetId(), "Orbital");
+			return mySelect.idleFabbers("Orbital");
 		} else {
-			return mySelect.idleFabbers(currentFocusPlanetId(), null, "Orbital");
+			return mySelect.idleFabbers(null, "Orbital");
 		}
 	}
 	model.select_all_scouts = function() {
-		return mySelect.unitsOnPlanet(currentFocusPlanetId(), "Scout");
+		return mySelect.unitsOnPlanet("Scout");
 	}
 	// No built-in way to check idle behaviour (idle fabbers/factories are hardcoded)
 	var isScout = unitTypeMatch("Scout");
@@ -869,10 +883,9 @@
 			return idle_scouts;
 		});
 	}
-	model.select_all_repair = function() {
-		var planet_id = currentFocusPlanetId();
-		mySelect.unitsOnPlanet(planet_id, ["CannonBuildable", "Construction"], ["Fabber"]);
-		mySelect.unitsOnPlanet(planet_id, ["Air", "MissileDefense"], null, "add");
+	model.select_all_land_and_air_repair = function() {
+		mySelect.unitsOnPlanet(["CannonBuildable", "Construction"], ["Fabber"]);
+		mySelect.unitsOnPlanet(["Air", "MissileDefense"], null, "add");
 	}
 
 	// ===============   Selection Edit   ===================
