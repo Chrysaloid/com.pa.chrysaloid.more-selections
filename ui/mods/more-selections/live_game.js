@@ -643,13 +643,14 @@
 		var myIdx = model.armyIndex();
 		var armyCount = model.armyCount();
 		var promisedCommanders = [];
+		var worldView = api.getWorldView(0);
 		model.celestialViewModels().forEach(function (planet, j) {
 			if (planet.dead() || planet.isSun()) return;
 			for (var i = 0; i < armyCount; i++) {
 				if (i === myIdx) continue;
 				promisedCommanders.push(getArmyUnitStates(isCommander, j, i).then(function (unitStates) { // unitStates will be filtered, if there are no commanders the array will be empty
 					return Promise.all(unitStates.map(function (unitState) {
-						return api.getWorldView(0).sendOrder({
+						return worldView.sendOrder({
 							units: unitState.id,
 							command: "ping",
 							location: {
@@ -819,7 +820,7 @@
 			).sortValuesSimple().join("\n")
 		);
 	}
-	var closestCountMax = 14;
+	var closestCountMax = 15;
 	function selectNClosestEntities(N, specFilterFun, specFilterEncapsulated, stateFilterFun, stateFilterEncapsulated) {
 		return getUnitsSortedByDistanceToCamera(specFilterEncapsulated ? specFilterFun() : specFilterFun).then(function (unitStates) {
 			if (stateFilterFun) unitStates = unitStates.filter(stateFilterEncapsulated ? stateFilterFun(unitStates) : stateFilterFun);
