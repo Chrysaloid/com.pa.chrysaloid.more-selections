@@ -686,22 +686,24 @@
 	// =================   Micro managing Astraeuses and Pelicans   ====================
 
 	var colonelOrVanguardOrInferno = {
-		"Colonel": true,
-		"Vanguard": true,
-		"Inferno": true,
+		"Colonel" : 1,
+		"Vanguard": 2,
+		"Inferno" : 3,
+	}
+	var infernoOrStitchOrDrifter = {
+		"Inferno": 1,
+		"Stitch" : 2,
+		"Drifter": 3,
 	}
 	function isAstraeusState(unitState) { return unitState.unit_spec.normalName === "Astraeus" }
 	function isPelicanState(unitState) { return unitState.unit_spec.normalName === "Pelican" }
 	function isEmptyAstraeusState(unitState, i, unitStates) { return unitState.unit_spec.normalName === "Astraeus" && !unitStates.some(isParent(unitState)) }
 	function isEmptyPelicanState(unitState, i, unitStates) { return unitState.unit_spec.normalName === "Pelican" && !unitStates.some(isParent(unitState)) }
-	function isFreeColonelOrVanguardOrInfernoSate(unitState) { return !unitState.parent && colonelOrVanguardOrInferno[unitState.unit_spec.normalName] }
-	function sortColonelOrVanguardOrInfernoState(unitState) {
-		switch (unitState.unit_spec.normalName) {
-			case "Colonel" : return 0;
-			case "Vanguard": return 1;
-			case "Inferno" : return 2;
-			default        : return 3;
-		}
+	function isFreeUnit(unitObj) {
+		return function (unitState) { return !unitState.parent && unitObj[unitState.unit_spec.normalName] }
+	}
+	function sortUnits(unitObj) {
+		return function (unitState) { return unitObj[unitState.unit_spec.normalName] || Infinity }
 	}
 	function all_empty_loaders_load_free_pickup_units(isEmptyLoader, loaderNames, isFreePickupUnit, pickupUnitNames, sortPickupUnits) {
 		return getArmyUnitStates().then(function (unitStates) {
@@ -740,22 +742,29 @@
 	model.all_empty_astraeuses_load_colonels_then_vanguards_then_infernos = all_empty_loaders_load_free_pickup_units.bind(null,
 		isEmptyAstraeusState,
 		"Astraeuses",
-		isFreeColonelOrVanguardOrInfernoSate,
+		isFreeUnit(colonelOrVanguardOrInferno),
 		"Colonels or Vanguards or Infernos",
-		sortColonelOrVanguardOrInfernoState
+		sortUnits(colonelOrVanguardOrInferno)
 	);
 	model.all_empty_pelicans_load_colonels_then_vanguards_then_infernos = all_empty_loaders_load_free_pickup_units.bind(null,
 		isEmptyPelicanState,
 		"Pelicans",
-		isFreeColonelOrVanguardOrInfernoSate,
+		isFreeUnit(colonelOrVanguardOrInferno),
 		"Colonels or Vanguards or Infernos",
-		sortColonelOrVanguardOrInfernoState
+		sortUnits(colonelOrVanguardOrInferno)
+	);
+	model.all_empty_astraeuses_load_infernos_then_stitches_then_drifters = all_empty_loaders_load_free_pickup_units.bind(null,
+		isEmptyAstraeusState,
+		"Astraeuses",
+		isFreeUnit(infernoOrStitchOrDrifter),
+		"Infernos or Stitches or Drifters",
+		sortUnits(infernoOrStitchOrDrifter)
 	);
 
 	// =================   Select closest   ====================
 
 	function isNotBeingBuilt(unitState) { return !unitState.parent }
-	function hasOrders(unitState) { return unitState.orders && !unitState.parent } // && !unitState.parent filters out units that are currently being built
+	function hasOrders(unitState) { return unitState.orders && !unitState.parent } // && !unitState.parent filters out units that are currently being built && that are being transported
 	function hasNoOrders(unitState) { return !unitState.orders && !unitState.parent }
 	function unitTypeMatch(typeExpression) {
 		var orArr = typeExpression.split("|").filter(Boolean).map(function (andArr) {

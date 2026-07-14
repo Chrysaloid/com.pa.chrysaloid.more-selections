@@ -157,6 +157,7 @@
 	display_sub_group = "Micro managing Astraeuses and Pelicans";
 	keyBind("all_empty_astraeuses_load_colonels_then_vanguards_then_infernos");
 	keyBind("all_empty_pelicans_load_colonels_then_vanguards_then_infernos");
+	keyBind("all_empty_astraeuses_load_infernos_then_stitches_then_drifters");
 
 	display_sub_group = "Miscellaneous selections";
 	keyBind("cycle_radars");
