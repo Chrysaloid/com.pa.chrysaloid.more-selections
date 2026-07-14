@@ -841,6 +841,11 @@
 
 	for (var i = 1; i <= closestCountMax; i++) model["select_" + i + "_closest_idle_fabbers"] = selectNClosestEntities.bind(null, i, fabberFilter, true, hasNoOrders, false); // model.select_1_closest_idle_fabbers()
 
+	function isArkyd(unitSpec) { return unitSpec.normalName === "ARKYD" }
+	function isHermes(unitSpec) { return unitSpec.normalName === "Hermes" }
+	for (var i = 1; i <= closestCountMax; i++) model["select_" + i + "_closest_idle_arkyds"] = selectNClosestEntities.bind(null, i, isArkyd, false, hasNoOrders, false); // model.select_1_closest_idle_fabbers()
+	for (var i = 1; i <= closestCountMax; i++) model["select_" + i + "_closest_idle_hermeses"] = selectNClosestEntities.bind(null, i, isHermes, false, hasNoOrders, false); // model.select_1_closest_idle_fabbers()
+
 	function isAstraeus(unitSpec) { return unitSpec.normalName === "Astraeus" }
 	function isPelican(unitSpec) { return unitSpec.normalName === "Pelican" }
 	function isParent(unitState) { return function (innerUnitState) { return innerUnitState.parent === unitState.id } }

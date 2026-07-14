@@ -53,6 +53,10 @@ The "area load" order is not enough for me as it loads everything in the radius 
 - **Select 1-15 closest idle fabbers**
 - **Select 1-15 closest fabbers**
 - **Select 1-15 closest factories**
+- **Select 1-15 closest empty [Astraeuses](https://palobby.com/units/unit/orbital_lander?version=titans)**
+- **Select 1-15 closest empty [Pelicans](https://palobby.com/units/unit/transport?version=titans)**
+- **Select 1-15 closest idle [ARKYDs](https://palobby.com/units/unit/radar_satellite?version=titans)**
+- **Select 1-15 closest idle [Hermeses](https://palobby.com/units/unit/orbital_probe?version=titans)**
 - **Select 1-15 closest combat units**
 
 ## License

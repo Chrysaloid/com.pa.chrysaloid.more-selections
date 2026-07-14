@@ -183,6 +183,8 @@
 		"factories",
 		"empty_astraeuses",
 		"empty_pelicans",
+		"idle_arkyds",
+		"idle_hermeses",
 		"combat_units",
 	]) {
 		display_sub_group = "Selection - closest " + group.replace(/_/g, " ");
