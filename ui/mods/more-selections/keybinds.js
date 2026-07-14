@@ -1,53 +1,118 @@
 (function() { // Sandbox test z dzisiaj
-	Object.defineProperty(Array.prototype, "contains", {
-		value: function (value) {
-			return this.indexOf(value) !== -1;
-		},
-	});
-	Object.defineProperty(Array.prototype, "sortValuesSimple", {
-		value: function (getValue) {
-			return getValue ? this.sort(function (a, b) {
-				var a1 = getValue(a);
-				var b1 = getValue(b);
-				if (a1 < b1) return -1;
-				if (a1 > b1) return 1;
-				return 0;
-			}) : this.sort(function (a, b) {
-				if (a < b) return -1;
-				if (a > b) return 1;
-				return 0;
-			});
-		},
-	});
-	Object.defineProperty(Array.prototype, "find", {
-		value: function (getValue) {
-			var i, length = this.length, item;
-			for (i = 0; i < length; i++) {
-				item = this[i];
-				if (getValue(item, i, this)) return item;
-			}
-		},
-	});
-	Object.defineProperty(Array.prototype, "promiseChain", {
-		value: function (getPromiseFromItem) {
-			var me = this, i = 0;
-			return me.reduce(function (promise, value) {
-				return promise.then(function () {
-					return getPromiseFromItem(value, i++, me);
-				});
-			}, Promise.resolve());
-		},
-	});
-	Object.defineProperty(String.prototype, "toTitleCase", {
-		value: function () { return this.charAt(0).toUpperCase() + this.substr(1).toLowerCase(); },
-	});
-
 	function log(val) {
 		console.log(val);
 	}
-
 	log("Hello keybind Chrysaloid!");
 
+	function identity(value) {
+		return value;
+	}
+	var noSetter = function (v) { throw new Error("This is a read-only property") };
+	function expandPrototype(proto, name, func, czyGet, writable, configurable) {
+		Object.defineProperty(proto.prototype, name,
+			czyGet ? {
+				get: func, // getter cannot be writable so when @czyGet is true then @writable is ignored
+				set: noSetter,
+				configurable: configurable,
+			} : {
+				value: func,
+				writable: writable,
+				configurable: configurable,
+			}
+		);
+	}
+	expandPrototype(String, "toTitleCase", function () {
+		return this.charAt(0).toUpperCase() + this.substr(1).toLowerCase();
+	});
+	expandPrototype(Array, "sortValuesSimple", function (getValue) {
+		return getValue ? this.sort(function (a, b) {
+			var a1 = getValue(a);
+			var b1 = getValue(b);
+			if (a1 < b1) return -1;
+			if (a1 > b1) return 1;
+			return 0;
+		}) : this.sort(function (a, b) {
+			if (a < b) return -1;
+			if (a > b) return 1;
+			return 0;
+		});
+	});
+	expandPrototype(Array, "includes", function (value) {
+		return this.indexOf(value) !== -1;
+	});
+	expandPrototype(Array, "find", function (getValue) {
+		var i, length = this.length, item;
+		for (i = 0; i < length; i++) {
+			item = this[i];
+			if (getValue(item, i, this)) return item;
+		}
+	});
+	expandPrototype(Array, "promiseChain", function (getPromiseFromItem) {
+		var me = this, i = 0;
+		return me.reduce(function (promise, value) {
+			return promise.then(function () {
+				return getPromiseFromItem(value, i++, me);
+			});
+		}, Promise.resolve());
+	});
+	expandPrototype(Array, "min", function (getter) {
+		var len = this.length;
+		if (!len) return null;
+		if (!getter) getter = identity;
+		var val = getter(this[0]);
+		for (var i = 1; i < len; i++) {
+			var newVal = getter(this[i]);
+			if (val > newVal) {
+				val = newVal;
+			}
+		}
+		return val;
+	});
+	expandPrototype(Array, "max", function (getter) {
+		var len = this.length;
+		if (!len) return null;
+		if (!getter) getter = identity;
+		var val = getter(this[0]);
+		for (var i = 1; i < len; i++) {
+			var newVal = getter(this[i]);
+			if (val < newVal) {
+				val = newVal;
+			}
+		}
+		return val;
+	});
+	expandPrototype(Array, "minElem", function (getter) {
+		var len = this.length;
+		if (!len) return null;
+		if (!getter) getter = identity;
+		var el = this[0];
+		var val = getter(el);
+		for (var i = 1; i < len; i++) {
+			var newEl = this[i];
+			var newVal = getter(newEl);
+			if (val > newVal) {
+				val = newVal;
+				el = newEl;
+			}
+		}
+		return el;
+	});
+	expandPrototype(Array, "maxElem", function (getter) {
+		var len = this.length;
+		if (!len) return null;
+		if (!getter) getter = identity;
+		var el = this[0];
+		var val = getter(el);
+		for (var i = 1; i < len; i++) {
+			var newEl = this[i];
+			var newVal = getter(newEl);
+			if (val < newVal) {
+				val = newVal;
+				el = newEl;
+			}
+		}
+		return el;
+	});
 	var isNodeJS = typeof process !== "undefined" && process.versions && process.versions.node;
 	var display_group = "MORE SELECTIONS";
 	var display_sub_group = "General";
@@ -89,6 +154,10 @@
 	// display_sub_group = "Moves";
 	// keyBind("test_move");
 
+	display_sub_group = "Micro managing Astraeuses and Pelicans";
+	keyBind("all_empty_astraeuses_load_colonels_then_vanguards_then_infernos");
+	keyBind("all_empty_pelicans_load_colonels_then_vanguards_then_infernos");
+
 	display_sub_group = "Miscellaneous selections";
 	keyBind("cycle_radars");
 	keyBind("select_all_fabbers");
@@ -111,8 +180,8 @@
 		"idle_fabbers",
 		"fabbers",
 		"factories",
-		"idle_astraeuses",
-		"idle_pelicans",
+		"empty_astraeuses",
+		"empty_pelicans",
 		"combat_units",
 	]) {
 		display_sub_group = "Selection - closest " + group.replace(/_/g, " ");

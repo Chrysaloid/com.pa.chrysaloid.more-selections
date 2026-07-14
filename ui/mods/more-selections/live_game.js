@@ -51,7 +51,7 @@
 	}
 	function cameraLookAt(locArr, planetId) {
 		api.camera.lookAt({
-			planet_id: planetId !== undefined ? planetId : model.currentFocusPlanetId(),
+			planet_id: planetId !== undefined ? planetId : currentFocusPlanetId(),
 			location: {x: locArr[0], y: locArr[1], z: locArr[2]} // , lat: 152.76652370095897, long: 0.3689341171248849
 		}, 1);
 	}
@@ -67,6 +67,9 @@
 		return function (elem) {
 			return elem[value](arg);
 		};
+	}
+	function currentFocusPlanetId() {
+		return api.camera.getFocus(api.Holodeck.focused.id).planet()
 	}
 	var oldHover = handlers.hover;
 	var lastHoverPayload;
@@ -132,28 +135,25 @@
 				unitSpec.types.forEach(function (type) { unitSpec.shortTypes[type.slice(9)] = true; }); // "UNITTYPE_".length === 9
 			}
 			if (unitSpec.build) {
-				unitSpec.builds = {}
-				unitSpec.build.forEach(function (id) { unitSpec.builds[id] = null });
+				unitSpec.builds = {};
+				unitSpec.build.forEach(function (id) { unitSpec.builds[id] = true });
 			}
+			unitSpec.normalName = unitSpec.name.replace("!LOC:","");
 		});
 	});
 
-	model.currentFocusPlanetId = function() {
-		return api.camera.getFocus(api.Holodeck.focused.id).planet()
-	}
-
-	var distance2d = function(p1x, p1y, p2x, p2y) {
+	function distance2d(p1x, p1y, p2x, p2y) {
 		var dx = p2x - p1x;
 		var dy = p2y - p1y;
 		return Math.sqrt(dx*dx + dy*dy);
 	}
-	var distance3d = function(v1, v2) {
+	function distance3d(v1, v2) {
 		var dx = v1[0] - v2[0];
 		var dy = v1[1] - v2[1];
 		var dz = v1[2] - v2[2];
 		return Math.sqrt(dx*dx + dy*dy + dz*dz);
 	}
-	var normalizeVector = function(x, y, z) {
+	function normalizeVector(x, y, z) {
 		if (x == 0 && y == 0 && z == 0) return [0, 0, 0];
 		var length = Math.sqrt( x*x + y*y + z*z )
 		return [x/length, y/length, z/length];
@@ -266,7 +266,7 @@
 	};
 
 	function getArmyUnitIds(filterFun, planetIndex, armyIndex) {
-		return api.getWorldView(0).getArmyUnits(armyIndex === undefined ? model.armyIndex() : armyIndex, planetIndex === undefined ? model.currentFocusPlanetId() : planetIndex).then(function (armyUnits) {
+		return api.getWorldView(0).getArmyUnits(armyIndex === undefined ? model.armyIndex() : armyIndex, planetIndex === undefined ? currentFocusPlanetId() : planetIndex).then(function (armyUnits) {
 			if (filterFun) {
 				var units = [];
 				var unitSpecs = model.unitSpecs;
@@ -285,6 +285,7 @@
 				api.getWorldView(0).getUnitState(unitIds).then(function (unitStates) {
 					unitStates.forEach(function (unitState, i) {
 						unitState.id = unitIds[i];
+						unitState.unit_spec = model.unitSpecs[unitState.unit_spec];
 					});
 					resolve(unitStates);
 				});
@@ -301,7 +302,7 @@
 		// normalization means casting a point onto a unit sphere in the center of the planet
 		// that means that orbital units have the same chance of being selected
 		var camPosN = normalizeVector(camPos.x, camPos.y, camPos.z);
-		return getArmyUnitStates(filterFun, model.currentFocusPlanetId(), armyIndex).then(function (unitStates) {
+		return getArmyUnitStates(filterFun, currentFocusPlanetId(), armyIndex).then(function (unitStates) {
 			unitStates.forEach(function (unitState, i) {
 				var unitPos = unitState.pos;
 				var unitPosN = normalizeVector(unitPos[0], unitPos[1], unitPos[2]);
@@ -312,11 +313,13 @@
 			return unitStates;
 		});
 	}
-	function getSelectionOrHover(additionalMessage) {
+	function getSelectionOrHover(additionalMessage, getHover) {
 		var selection = model.selection();
 		if (!selection) {
-			logChatMessage("Nothing is selected" + (additionalMessage ? ". " + additionalMessage : ""));
-			return;
+			if (!getHover) {
+				logChatMessage("Nothing is selected" + (additionalMessage ? ". " + additionalMessage : ""));
+				return;
+			}
 			if (lastHoverPayload.entity) {
 				selection = {};
 				selection[lastHoverPayload.spec_id] = [lastHoverPayload.entity];
@@ -337,18 +340,24 @@
 			return false;
 		}
 	}
+	function unitInfoShared(unitStates) {
+		unitStates.forEach(function (unitState, i) {
+			unitState.id = units[i];
+			unitState.unit_spec = model.unitSpecs[unitState.unit_spec];
+		});
+		unitStates = unitStates.length > 1 ? unitStates : unitStates[0]
+		console.log(unitStates);
+		return unitStates;
+	}
 	function getSelectedUnitInfo() {
 		var selection = getSelectionOrHover(message);
 		if (!selection) return;
 		var units = _.flatten(_.toArray(selection.spec_ids));
-		return api.getWorldView(0).getUnitState(units).then(function (unitStats) {
-			unitStats.forEach(function (unitStat, i) {
-				unitStat.id = units[i];
-			});
-			unitStats = unitStats.length > 1 ? unitStats : unitStats[0]
-			console.log(unitStats);
-			return unitStats;
-		})
+		return api.getWorldView(0).getUnitState(units).then(unitInfoShared);
+	}
+	function getInfoById(ids) {
+		ids = _.isArray(ids) ? ids : [ids]
+		return api.getWorldView(0).getUnitState(ids).then(unitInfoShared);
 	}
 	function whileAsync(condition, body) {
 		function next() {
@@ -374,6 +383,7 @@
 		var zoomLevel = api.camera.getFocus(api.Holodeck.focused.id).zoomLevel();
 		return zoomLevel === "orbital" || zoomLevel === "celestial";
 	}
+	model.getSelectionOrHover = getSelectionOrHover;
 
 	// =================   Factory managment  ====================
 
@@ -652,16 +662,86 @@
 			units: units,
 			command: "move",
 			location: {
-				planet: model.currentFocusPlanetId(),
+				planet: currentFocusPlanetId(),
 				pos: [1,2,3],
 			},
 		});
 	}
 
+	// =================   Micro managing Astraeuses and Pelicans   ====================
+
+	var colonelOrVanguardOrInferno = {
+		"Colonel": true,
+		"Vanguard": true,
+		"Inferno": true,
+	}
+	function isAstraeusState(unitState) { return unitState.unit_spec.normalName === "Astraeus" }
+	function isPelicanState(unitState) { return unitState.unit_spec.normalName === "Pelican" }
+	function isEmptyAstraeusState(unitState, i, unitStates) { return unitState.unit_spec.normalName === "Astraeus" && !unitStates.some(isParent(unitState)) }
+	function isEmptyPelicanState(unitState, i, unitStates) { return unitState.unit_spec.normalName === "Pelican" && !unitStates.some(isParent(unitState)) }
+	function isFreeColonelOrVanguardOrInfernoSate(unitState) { return !unitState.parent && colonelOrVanguardOrInferno[unitState.unit_spec.normalName] }
+	function sortColonelOrVanguardOrInfernoState(unitState) {
+		switch (unitState.unit_spec.normalName) {
+			case "Colonel" : return 0;
+			case "Vanguard": return 1;
+			case "Inferno" : return 2;
+			default        : return 3;
+		}
+	}
+	function all_empty_loaders_load_free_pickup_units(isEmptyLoader, loaderNames, isFreePickupUnit, pickupUnitNames, sortPickupUnits) {
+		return getArmyUnitStates().then(function (unitStates) {
+			var loaders = unitStates.filter(isEmptyLoader);
+			if (!loaders.length) {
+				logChatMessage("There are no empty " + loaderNames + " in your army");
+				return;
+			}
+			var pickupUnits = unitStates.filter(isFreePickupUnit);
+			if (!pickupUnits.length) {
+				logChatMessage("There are no free " + pickupUnitNames + " in your army");
+				return;
+			}
+			pickupUnits.sortValuesSimple(sortPickupUnits);
+			var minLen = Math.min(loaders.length, pickupUnits.length);
+			var worldView = api.getWorldView(0);
+			var loaderIds = [];
+			for (var i = 0; i < minLen; i++) {
+				var pickupUnit = pickupUnits[i];
+				var loader = loaders.minElem(function(unitState) {
+					return unitState.taken ? Infinity : distance3d(unitState.pos, pickupUnit.pos);
+				});
+				loader.taken = true;
+				loaderIds.push(loader.id);
+				worldView.sendOrder({
+					units: loader.id,
+					command: "load",
+					location: {
+						entity: pickupUnit.id,
+					},
+				});
+			}
+			mySelect.unitsById(loaderIds);
+		});
+	}
+	model.all_empty_astraeuses_load_colonels_then_vanguards_then_infernos = all_empty_loaders_load_free_pickup_units.bind(null,
+		isEmptyAstraeusState,
+		"Astraeuses",
+		isFreeColonelOrVanguardOrInfernoSate,
+		"Colonels or Vanguards or Infernos",
+		sortColonelOrVanguardOrInfernoState
+	);
+	model.all_empty_pelicans_load_colonels_then_vanguards_then_infernos = all_empty_loaders_load_free_pickup_units.bind(null,
+		isEmptyPelicanState,
+		"Pelicans",
+		isFreeColonelOrVanguardOrInfernoSate,
+		"Colonels or Vanguards or Infernos",
+		sortColonelOrVanguardOrInfernoState
+	);
+
 	// =================   Select closest   ====================
 
-	var hasOrders = function(unitState) { return unitState.orders && !unitState.parent }; // && !unitState.parent filters out units that are currently being built
-	var hasNoOrders = function(unitState) { return !unitState.orders && !unitState.parent };
+	function isNotBeingBuilt(unitState) { return !unitState.parent }
+	function hasOrders(unitState) { return unitState.orders && !unitState.parent } // && !unitState.parent filters out units that are currently being built
+	function hasNoOrders(unitState) { return !unitState.orders && !unitState.parent }
 	function unitTypeMatch(typeExpression) {
 		var orArr = typeExpression.split("|").filter(Boolean).map(function (andArr) {
 			return andArr.split(" ").filter(Boolean).map(function (unitType) {
@@ -686,14 +766,14 @@
 				// 	}
 				// }
 				// return true;
-				return !andArr.find(function (expr) { return shortTypes[expr[0]] !== expr[1] }); // find not matching type and if you do that's bad, and if you don't that's good
+				return !andArr.some(function (expr) { return shortTypes[expr[0]] !== expr[1] }); // find not matching type and if you do that's bad, and if you don't that's good
 			};
 		}
 
 		return function(unitSpec) {
 			// var subresult;
 			var shortTypes = unitSpec.shortTypes;
-			return orArr.find(function (andArr) { // find first truthy value, orArr is array of arrays and arrays are always truthy, if not found returns undefined that is falsy
+			return orArr.some(function (andArr) { // find first truthy value, orArr is array of arrays and arrays are always truthy, if not found returns undefined that is falsy
 				// subresult = true;
 				// for (var expr of andArr) {
 				// 	if (shortTypes[expr[0]] !== expr[1]) {
@@ -702,7 +782,7 @@
 				// 	}
 				// }
 				// if (subresult) return true;
-				return !andArr.find(function (expr) { return shortTypes[expr[0]] !== expr[1] })
+				return !andArr.some(function (expr) { return shortTypes[expr[0]] !== expr[1] })
 			});
 		};
 	}
@@ -716,39 +796,41 @@
 		);
 	}
 	var closestCountMax = 14;
-	function selectNClosestEntities(N, specFilterFun, specFilterEncapsulated, stateFilterFun) {
+	function selectNClosestEntities(N, specFilterFun, specFilterEncapsulated, stateFilterFun, stateFilterEncapsulated) {
 		return getUnitsSortedByDistanceToCamera(specFilterEncapsulated ? specFilterFun() : specFilterFun).then(function (unitStates) {
-			if (stateFilterFun) unitStates = unitStates.filter(stateFilterFun);
+			if (stateFilterFun) unitStates = unitStates.filter(stateFilterEncapsulated ? stateFilterFun(unitStates) : stateFilterFun);
 			mySelect.unitsById(unitStates.map(toId).slice(0,N));
 			return unitStates;
 		});
 	}
 	// var isCombat = function (unitSpec) { return unitSpec.shortTypes["Mobile"] && !unitSpec.shortTypes["Fabber"] };
 	var isCombat = unitTypeMatch("Mobile -Fabber -Commander");
-	for (var i = 1; i <= closestCountMax; i++) model["select_" + i + "_closest_combat_units"] = selectNClosestEntities.bind(null, i, isCombat, false, null); // model.select_1_closest_combat_units()
+	for (var i = 1; i <= closestCountMax; i++) model["select_" + i + "_closest_combat_units"] = selectNClosestEntities.bind(null, i, isCombat, false, null, false); // model.select_1_closest_combat_units()
 
 	var isFactory = unitTypeMatch("Factory");
-	for (var i = 1; i <= closestCountMax; i++) model["select_" + i + "_closest_factories"] = selectNClosestEntities.bind(null, i, isFactory, false, null); // model.select_1_closest_factories()
+	for (var i = 1; i <= closestCountMax; i++) model["select_" + i + "_closest_factories"] = selectNClosestEntities.bind(null, i, isFactory, false, null, false); // model.select_1_closest_factories()
 
 	var isNonOrbitalFabber = unitTypeMatch("Fabber -Orbital");
 	var isOrbitalFabber = unitTypeMatch("Fabber Orbital");
-	var fabberFilter = function () { return shouldGetOrbitalFabbers() ? isOrbitalFabber : isNonOrbitalFabber }
-	for (var i = 1; i <= closestCountMax; i++) model["select_" + i + "_closest_fabbers"] = selectNClosestEntities.bind(null, i, fabberFilter, true, null); // model.select_1_closest_fabbers()
+	function fabberFilter() { return shouldGetOrbitalFabbers() ? isOrbitalFabber : isNonOrbitalFabber }
+	for (var i = 1; i <= closestCountMax; i++) model["select_" + i + "_closest_fabbers"] = selectNClosestEntities.bind(null, i, fabberFilter, true, null, false); // model.select_1_closest_fabbers()
 
-	for (var i = 1; i <= closestCountMax; i++) model["select_" + i + "_closest_idle_fabbers"] = selectNClosestEntities.bind(null, i, fabberFilter, true, hasNoOrders); // model.select_1_closest_idle_fabbers()
+	for (var i = 1; i <= closestCountMax; i++) model["select_" + i + "_closest_idle_fabbers"] = selectNClosestEntities.bind(null, i, fabberFilter, true, hasNoOrders, false); // model.select_1_closest_idle_fabbers()
 
-	var isAstraeus = function (unitSpec) { return unitSpec.name === "Astraeus" };
-	for (var i = 1; i <= closestCountMax; i++) model["select_" + i + "_closest_idle_astraeuses"] = selectNClosestEntities.bind(null, i, isAstraeus, false, hasNoOrders); // model.select_1_closest_idle_fabbers()
-
-	var isPelican = function (unitSpec) { return unitSpec.name === "Pelican" };
-	for (var i = 1; i <= closestCountMax; i++) model["select_" + i + "_closest_idle_pelicans"] = selectNClosestEntities.bind(null, i, isPelican, false, hasNoOrders); // model.select_1_closest_idle_fabbers()
+	function isAstraeus(unitSpec) { return unitSpec.normalName === "Astraeus" }
+	function isPelican(unitSpec) { return unitSpec.normalName === "Pelican" }
+	function isParent(unitState) { return function (innerUnitState) { return innerUnitState.parent === unitState.id } }
+	function isEmptyAstraeus(unitState, i, unitStates) { return unitState.unit_spec.normalName === "Astraeus" && !unitStates.some(isParent(unitState)) }
+	function isEmptyPelican(unitState, i, unitStates) { return unitState.unit_spec.normalName === "Pelican" && !unitStates.some(isParent(unitState)) }
+	for (var i = 1; i <= closestCountMax; i++) model["select_" + i + "_closest_empty_astraeuses"] = selectNClosestEntities.bind(null, i, null, false, isEmptyAstraeus, false); // model.select_1_closest_idle_fabbers()
+	for (var i = 1; i <= closestCountMax; i++) model["select_" + i + "_closest_empty_pelicans"] = selectNClosestEntities.bind(null, i, null, false, isEmptyPelican, false); // model.select_1_closest_idle_fabbers()
 
 	// =================   Miscellaneous selections  ====================
 
 	var radarType = 0;
 	model.cycle_radars = function() {
 		radarType = (radarType + 1) % 2
-		var planet_id = model.currentFocusPlanetId();
+		var planet_id = currentFocusPlanetId();
 		if (radarType) { // structure
 			mySelect.unitsOnPlanet(planet_id, ["Recon", "Structure"]); // Radars
 			mySelect.unitsOnPlanet(planet_id, ["NukeDefense", "Structure"], null, "add"); // Anti-nuke
@@ -762,21 +844,21 @@
 	}
 	model.select_all_fabbers = function() {
 		if (shouldGetOrbitalFabbers()) {
-			return mySelect.unitsOnPlanet(model.currentFocusPlanetId(), ["Fabber", "Orbital"]);
+			return mySelect.unitsOnPlanet(currentFocusPlanetId(), ["Fabber", "Orbital"]);
 		} else {
-			return mySelect.unitsOnPlanet(model.currentFocusPlanetId(), "Fabber", "Orbital");
+			return mySelect.unitsOnPlanet(currentFocusPlanetId(), "Fabber", "Orbital");
 		}
 	}
 	// Note this is global, whereas the default select fabbers is on screen only
 	model.select_all_idle_fabbers = function() {
 		if (shouldGetOrbitalFabbers()) {
-			return mySelect.idleFabbers(model.currentFocusPlanetId(), "Orbital");
+			return mySelect.idleFabbers(currentFocusPlanetId(), "Orbital");
 		} else {
-			return mySelect.idleFabbers(model.currentFocusPlanetId(), null, "Orbital");
+			return mySelect.idleFabbers(currentFocusPlanetId(), null, "Orbital");
 		}
 	}
 	model.select_all_scouts = function() {
-		return mySelect.unitsOnPlanet(model.currentFocusPlanetId(), "Scout");
+		return mySelect.unitsOnPlanet(currentFocusPlanetId(), "Scout");
 	}
 	// No built-in way to check idle behaviour (idle fabbers/factories are hardcoded)
 	var isScout = unitTypeMatch("Scout");
@@ -788,7 +870,7 @@
 		});
 	}
 	model.select_all_repair = function() {
-		var planet_id = model.currentFocusPlanetId();
+		var planet_id = currentFocusPlanetId();
 		mySelect.unitsOnPlanet(planet_id, ["CannonBuildable", "Construction"], ["Fabber"]);
 		mySelect.unitsOnPlanet(planet_id, ["Air", "MissileDefense"], null, "add");
 	}
