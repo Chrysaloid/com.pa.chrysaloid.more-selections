@@ -482,7 +482,10 @@
 	var factory_spec_ids = {};
 	var factoryQueueStoreKey = "chrysaloid.factoryQueuesStore";
 	var specSuffix;
-	sleep(200).then(function() { // delay isnenecessary here because at this time model.unitSpecs is undefined
+	// model.factory_spec_ids = factory_spec_ids;
+	// model.factory_queues = factory_queues;
+	sleep(2000).then(function() { // a big delay is nenecessary here because at this time model.unitSpecs is undefined or does not have the suffixes added yet
+		log("configuring factory_queues");
 		specSuffix = Object.keys(model.unitSpecs).some(function (key) { return key.endsWith(".player") }) ? ".player" : "";
 		var factoryQueuesStore = JSON.parse(localStorage.getItem(factoryQueueStoreKey) || "{}");
 		factory_queues.forEach(function (factory_queue) {
