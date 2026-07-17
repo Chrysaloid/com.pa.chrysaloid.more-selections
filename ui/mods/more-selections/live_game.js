@@ -127,7 +127,8 @@
 		return oldHover(payload);
 	};
 
-	sleep(200).then(function() { // delay isnenecessary here because at this time model.unitSpecs is undefined
+	sleep(2000).then(function() { // delay isnenecessary here because at this time model.unitSpecs is undefined
+		log("modyfying model.unitSpecs")
 		Object.keys(model.unitSpecs).forEach(function (key) {
 			var unitSpec = model.unitSpecs[key];
 			unitSpec.shortTypes = {};
