@@ -154,6 +154,9 @@
 	// display_sub_group = "Moves";
 	// keyBind("test_move");
 
+	display_sub_group = "Micro managing bombers";
+	keyBind("selected_bumblebees_attack_enemies_on_screen");
+
 	display_sub_group = "Micro managing Astraeuses and Pelicans";
 	keyBind("all_empty_astraeuses_load_colonels_then_vanguards_then_infernos");
 	keyBind("all_empty_pelicans_load_colonels_then_vanguards_then_infernos");

@@ -128,7 +128,7 @@
 	};
 
 	sleep(2000).then(function() { // delay isnenecessary here because at this time model.unitSpecs is undefined
-		log("modyfying model.unitSpecs")
+		log("modyfying model.unitSpecs");
 		Object.keys(model.unitSpecs).forEach(function (key) {
 			var unitSpec = model.unitSpecs[key];
 			unitSpec.shortTypes = {};
@@ -281,13 +281,13 @@
 		empty: function () { return engine.call("select.empty"); },
 	};
 
-	function getArmyUnitIds(filterFun, planetIndex, armyIndex) {
+	function getArmyUnitIds(specFilterFun, planetIndex, armyIndex) {
 		return api.getWorldView(0).getArmyUnits(armyIndex === undefined ? model.armyIndex() : armyIndex, planetIndex === undefined ? currentFocusPlanetId() : planetIndex).then(function (armyUnits) {
-			if (filterFun) {
+			if (specFilterFun) {
 				var units = [];
 				var unitSpecs = model.unitSpecs;
 				Object.keys(armyUnits).forEach(function (key) {
-					if (filterFun(unitSpecs[key])) units.push(armyUnits[key]); // creating array of arrays because armyUnits[key] is array
+					if (specFilterFun(unitSpecs[key])) units.push(armyUnits[key]); // creating array of arrays because armyUnits[key] is array
 				});
 				return _.flatten(units);
 			} else {
@@ -295,9 +295,9 @@
 			}
 		});
 	}
-	function getArmyUnitStates(filterFun, planetIndex, armyIndex) {
+	function getArmyUnitStates(specFilterFun, planetIndex, armyIndex) {
 		return new Promise(function (resolve) {
-			getArmyUnitIds(filterFun, planetIndex, armyIndex).then(function (unitIds) {
+			getArmyUnitIds(specFilterFun, planetIndex, armyIndex).then(function (unitIds) {
 				api.getWorldView(0).getUnitState(unitIds).then(function (unitStates) {
 					unitStates.forEach(function (unitState, i) {
 						unitState.id = unitIds[i];
@@ -356,24 +356,25 @@
 			return false;
 		}
 	}
+	var units;
 	function unitInfoShared(unitStates) {
 		unitStates.forEach(function (unitState, i) {
 			unitState.id = units[i];
 			unitState.unit_spec = model.unitSpecs[unitState.unit_spec];
 		});
-		unitStates = unitStates.length > 1 ? unitStates : unitStates[0]
+		unitStates = unitStates.length > 1 ? unitStates : unitStates[0];
 		console.log(unitStates);
 		return unitStates;
 	}
 	function getSelectedUnitInfo() {
 		var selection = getSelectionOrHover(message);
 		if (!selection) return;
-		var units = _.flatten(_.toArray(selection.spec_ids));
+		units = _.flatten(_.toArray(selection.spec_ids));
 		return api.getWorldView(0).getUnitState(units).then(unitInfoShared);
 	}
 	function getInfoById(ids) {
-		ids = _.isArray(ids) ? ids : [ids]
-		return api.getWorldView(0).getUnitState(ids).then(unitInfoShared);
+		units = _.isArray(ids) ? ids : [ids];
+		return api.getWorldView(0).getUnitState(units).then(unitInfoShared);
 	}
 	function whileAsync(condition, body) {
 		function next() {
@@ -398,6 +399,146 @@
 	function shouldGetOrbitalFabbers() {
 		var zoomLevel = api.camera.getFocus(api.Holodeck.focused.id).zoomLevel();
 		return zoomLevel === "orbital" || zoomLevel === "celestial";
+	}
+
+	// There is no engine-exposed "enemy units on screen" selector (api.select's OnScreen family is
+	// mine-only) and no worldToScreen helper either, so we calibrate a camera projection matrix
+	// ourselves each time: sample a grid of screen points with raycastTerrain (screen -> world),
+	// then solve for the 3x4 matrix that maps world -> screen via DLT (least squares). That matrix
+	// is valid for any world point, not just terrain, so it also works for airborne units.
+	// A point can be inside the projected viewport bounds and still be hidden behind the planet's
+	// own horizon, so we additionally raycastTerrain() the candidate's projected screen position and
+	// compare distances-to-camera: if terrain is closer than the candidate, the planet occludes it.
+	function solveLinearSystem(A, b) {
+		var n = A.length;
+		var M = A.map(function (row, i) { return row.concat([b[i]]); });
+		for (var col = 0; col < n; col++) {
+			var pivot = col;
+			for (var r = col + 1; r < n; r++) {
+				if (Math.abs(M[r][col]) > Math.abs(M[pivot][col])) pivot = r;
+			}
+			var tmp = M[col]; M[col] = M[pivot]; M[pivot] = tmp;
+			if (Math.abs(M[col][col]) < 1e-12) continue;
+			for (var r2 = 0; r2 < n; r2++) {
+				if (r2 === col) continue;
+				var factor = M[r2][col] / M[col][col];
+				for (var c2 = col; c2 <= n; c2++) M[r2][c2] -= factor * M[col][c2];
+			}
+		}
+		return M.map(function (row, i) { return row[n] / (row[i] || 1e-12); });
+	}
+	function calibrateProjectionMatrix(correspondences) {
+		// unknowns: [p11,p12,p13,p14, p21,p22,p23,p24, p31,p32,p33], p34 fixed = 1 (removes scale ambiguity)
+		var AtA = [];
+		for (var i = 0; i < 11; i++) {
+			var zeroRow = [];
+			for (var z = 0; z < 11; z++) zeroRow.push(0);
+			AtA.push(zeroRow);
+		}
+		var Atb = [];
+		for (var z2 = 0; z2 < 11; z2++) Atb.push(0);
+
+		correspondences.forEach(function (c) {
+			var X = c.X, Y = c.Y, Z = c.Z, u = c.u, v = c.v;
+			var rowU = [X, Y, Z, 1, 0, 0, 0, 0, -u * X, -u * Y, -u * Z];
+			var rowV = [0, 0, 0, 0, X, Y, Z, 1, -v * X, -v * Y, -v * Z];
+			[[rowU, u], [rowV, v]].forEach(function (pair) {
+				var row = pair[0], rhs = pair[1];
+				for (var a = 0; a < 11; a++) {
+					Atb[a] += row[a] * rhs;
+					for (var bIdx = 0; bIdx < 11; bIdx++) {
+						AtA[a][bIdx] += row[a] * row[bIdx];
+					}
+				}
+			});
+		});
+
+		var p = solveLinearSystem(AtA, Atb);
+		return {
+			p11: p[0], p12: p[1], p13: p[2], p14: p[3],
+			p21: p[4], p22: p[5], p23: p[6], p24: p[7],
+			p31: p[8], p32: p[9], p33: p[10], p34: 1
+		};
+	}
+	function projectWorldToScreen(P, pos) {
+		var X = pos[0], Y = pos[1], Z = pos[2];
+		var w =  P.p31 * X + P.p32 * Y + P.p33 * Z + P.p34;
+		var u = (P.p11 * X + P.p12 * Y + P.p13 * Z + P.p14) / w;
+		var v = (P.p21 * X + P.p22 * Y + P.p23 * Z + P.p24) / w;
+		return { u: u, v: v, w: w };
+	}
+	function getCameraCenterFromProjectionMatrix(P) {
+		var A = [[P.p11, P.p12, P.p13], [P.p21, P.p22, P.p23], [P.p31, P.p32, P.p33]];
+		var b = [-P.p14, -P.p24, -P.p34];
+		return solveLinearSystem(A, b);
+	}
+	function getEnemyUnitsOnScreen(specFilterFun) {
+		var planetId = currentFocusPlanetId();
+		var W = window.innerWidth * devicePixelRatio;
+		var H = window.innerHeight * devicePixelRatio;
+		var gridCols = 9, gridRows = 9;
+		var samplePoints = [];
+		for (var i = 0; i < gridCols; i++) {
+			for (var j = 0; j < gridRows; j++) {
+				samplePoints.push({
+					u: (0.05 + 0.9 * i / (gridCols - 1)) * W,
+					v: (0.05 + 0.9 * j / (gridRows - 1)) * H
+				});
+			}
+		}
+
+		return Promise.all(samplePoints.map(function (pt) {
+			return model.holodeck.raycastTerrain(pt.u, pt.v).then(function (loc3D) {
+				if (!loc3D || !loc3D.pos) return null;
+				if (typeof loc3D.planet === "number" && loc3D.planet !== planetId) return null;
+				return { u: pt.u, v: pt.v, X: loc3D.pos[0], Y: loc3D.pos[1], Z: loc3D.pos[2] };
+			}, function () { return null; });
+		})).then(function (results) {
+			var valid = results.filter(Boolean);
+			if (valid.length < 6) return []; // camera isn't looking at this planet's terrain, can't calibrate
+
+			var P = calibrateProjectionMatrix(valid);
+			var camCenter = getCameraCenterFromProjectionMatrix(P);
+
+			var myArmy = model.armyIndex();
+			var armyCount = model.armyCount();
+			var enemyArmyIndices = [];
+			for (var a = 0; a < armyCount; a++) { if (a !== myArmy) enemyArmyIndices.push(a); }
+
+			return Promise.all(enemyArmyIndices.map(function (armyIdx) {
+				return getArmyUnitIds(specFilterFun, planetId, armyIdx);
+			})).then(function (perArmy) {
+				var enemyIds = _.flatten(perArmy);
+				if (!enemyIds.length) return [];
+
+				return api.getWorldView(0).getUnitState(enemyIds).then(function (unitStates) {
+					var candidates = [];
+					unitStates.forEach(function (unitState, i) {
+						var proj = projectWorldToScreen(P, unitState.pos);
+						if (0 < proj.w && (0 <= proj.u && proj.u <= W) && (0 <= proj.v && proj.v <= H)) {
+							unitState.id = enemyIds[i];
+							unitState.unit_spec = model.unitSpecs[unitState.unit_spec];
+							unitState.proj = proj;
+							candidates.push(unitState);
+						}
+					});
+					if (!candidates.length) return [];
+
+					return Promise.all(candidates.map(function (candidate) {
+						return model.holodeck.raycastTerrain(candidate.proj.u, candidate.proj.v).then(function (loc3D) {
+							return { candidate: candidate, terrainHit: loc3D };
+						}, function () { return { candidate: candidate, terrainHit: null }; });
+					})).then(function (occlusionResults) {
+						var OCCLUSION_EPS = 5; // world units of slack for terrain-sample noise
+						return occlusionResults.filter(function (result) {
+							var unitDist = distance3d(camCenter, result.candidate.pos);
+							var terrainDist = result.terrainHit && result.terrainHit.pos ? distance3d(camCenter, result.terrainHit.pos) : null;
+							return !(terrainDist !== null && terrainDist < unitDist - OCCLUSION_EPS);
+						}).map(getProp("candidate"));
+					});
+				});
+			});
+		});
 	}
 	model.getSelectionOrHover = getSelectionOrHover;
 
@@ -688,6 +829,49 @@
 		});
 	}
 
+	// =================   Micro managing bombers   ====================
+
+	var isAntiAir = unitTypeMatch("AirDefense -Orbital -Air", true);
+	var isNotAntiAir = unitTypeMatch("Mobile -AirDefense -Orbital -Air", true);
+	model.selected_bumblebees_attack_enemies_on_screen = function() {
+		var selection = getSelectionOrHover();
+		if (!selection) return;
+		var bomberIds = selection.spec_ids["/pa/units/air/bomber/bomber.json" + specSuffix];
+		if (!bomberIds || !bomberIds.length) {
+			logChatMessage("No Bumblebees in selection");
+			return;
+		}
+
+		mySelect.unitsById(bomberIds); // replace selection with only the Bumblebees for further orders or correction or recalls
+
+		var planetId = currentFocusPlanetId();
+		var worldView = api.getWorldView(0);
+
+		return getEnemyUnitsOnScreen().then(function (enemies) {
+			if (!enemies.length) {
+				logChatMessage("No enemy units visible on screen");
+				return;
+			}
+
+			var aaTargetIds = enemies.filter(isAntiAir).map(toId);
+			var otherTargetIds = enemies.filter(isNotAntiAir).map(toId);
+
+			bomberIds.forEach(function (bomberId) {
+				var targetIds = _.shuffle(aaTargetIds).concat(_.shuffle(otherTargetIds));
+				targetIds.forEach(function (targetId, i) {
+					worldView.sendOrder({
+						units: bomberId,
+						command: "attack",
+						location: { planet: planetId, entity: targetId },
+						queue: i > 0,
+					});
+				});
+			});
+
+			return bomberIds;
+		});
+	}
+
 	// =================   Micro managing Astraeuses and Pelicans   ====================
 
 	var colonelOrVanguardOrInferno = {
@@ -771,7 +955,7 @@
 	function isNotBeingBuilt(unitState) { return !unitState.parent }
 	function hasOrders(unitState) { return unitState.orders && !unitState.parent } // && !unitState.parent filters out units that are currently being built && that are being transported
 	function hasNoOrders(unitState) { return !unitState.orders && !unitState.parent }
-	function unitTypeMatch(typeExpression) {
+	function unitTypeMatch(typeExpression, matchState) {
 		var orArr = typeExpression.split("|").filter(Boolean).map(function (andArr) {
 			return andArr.split(" ").filter(Boolean).map(function (unitType) {
 				return [unitType.trim().replace(/\W+/g, ""), unitType.trim().startsWith("-") ? undefined : true]
@@ -785,9 +969,16 @@
 			if (andArr.length === 1) {
 				var shortType = andArr[0][0];
 				var matchVal = andArr[0][1];
-				return function (unitSpec) { return unitSpec.shortTypes[shortType] === matchVal };
+				return matchState ? function (unitState) {
+					return unitState.unit_spec.shortTypes[shortType] === matchVal;
+				} : function (unitSpec) {
+					return unitSpec.shortTypes[shortType] === matchVal;
+				};
 			}
-			return function(unitSpec) {
+			return matchState ? function(unitState) {
+				var shortTypes = unitState.unit_spec.shortTypes;
+				return !andArr.some(function (expr) { return shortTypes[expr[0]] !== expr[1] }); // find not matching type and if you do that's bad, and if you don't that's good
+			} : function(unitSpec) {
 				var shortTypes = unitSpec.shortTypes;
 				// for (var expr of andArr) { // for..of is slower in this old JS version
 				// 	if (shortTypes[expr[0]] !== expr[1]) {
@@ -799,7 +990,12 @@
 			};
 		}
 
-		return function(unitSpec) {
+		return matchState ? function(unitState) {
+			var shortTypes = unitState.unit_spec.shortTypes;
+			return orArr.some(function (andArr) {
+				return !andArr.some(function (expr) { return shortTypes[expr[0]] !== expr[1] })
+			});
+		} : function(unitSpec) {
 			// var subresult;
 			var shortTypes = unitSpec.shortTypes;
 			return orArr.some(function (andArr) { // find first truthy value, orArr is array of arrays and arrays are always truthy, if not found returns undefined that is falsy

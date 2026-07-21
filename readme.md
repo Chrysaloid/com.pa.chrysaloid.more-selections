@@ -23,7 +23,17 @@ Unpack zip into `%localappdata%\Uber Entertainment\Planetary Annihilation\client
 Hold `SHIFT` to not replace existing queue and instead add the copied queue to the existing one. To clear queue for a factory type, simply copy a factory that has no queue. If you have copied an empty queue (or not copied one at all) and if you paste the queue it will just clear the current queue (like executing STOP order but without canceling current build).
 
 ## Locate units
-- **Ping last known enemy commanders' positions**
+- **Ping last known enemy commanders' positions** - If the enemy commander has not been seen yet in this game a message will be printed to the chat.
+
+## Micro managing bombers
+- **Selected Bumblebees attack enemies on screen**
+	- If you have selected something else than Bumblebees then it will get deselected and only Bumblebees will remain in your selection.
+	- Bumblebees will attack first anti-air units ([Narwhal](https://palobby.com/units/unit/frigate?version=titans), [Spinner](https://palobby.com/units/unit/aa_missile_vehicle?version=titans), [Stinger](https://palobby.com/units/unit/bot_aa?version=titans), [Stingray](https://palobby.com/units/unit/missile_ship?version=titans), [Storm](https://palobby.com/units/unit/tank_flak?version=titans), [Flak Cannon](https://palobby.com/units/unit/air_defense_adv?version=titans), [Galata Turret](https://palobby.com/units/unit/air_defense?version=titans)) than anything else. If structures are in view they will be attacked as well.
+	- Enemy units get separated into 2 list: anti-air and other. For each Bumblebee each list gets shuffled and joind together (first anti-air, then other) and the resulting list is set as attack queue for that Bumblebee. This is attempt to easily (without sophisticated position-aware calculations) maximize the area of bombing. "Why not just use the area attack order?" Because it is static and despite the fact that Bumblebees have built in priorities to attack anti-air units first, I noticed that they sometimes do it too slowly as they tend to fly towards the center of the order circle instead of straight to the anti-air unit.
+	- The usage goes like this:
+		- Select Bumblebees that you want to attack with.
+		- Zoom closely onto enemy squad you want to attack.
+		- Press the keybind.
 
 ## Micro managing Astraeuses and Pelicans
 The "area load" order is not enough for me as it loads everything in the radius and I wanted to only load powerful units. That's why I created this function. As keybinds don't allow for parameters the pickup unit priority order has to be hardcoded into the keybind. In the future I might add more keybinds in this group.
