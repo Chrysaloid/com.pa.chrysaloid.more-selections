@@ -461,6 +461,8 @@
 		};
 	}
 	function projectWorldToScreen(P, pos) {
+		// standard homogeneous camera projection: divide by w to get the perspective effect.
+		// w <= 0 means the point is behind the camera, not just off-screen, so callers must check it.
 		var X = pos[0], Y = pos[1], Z = pos[2];
 		var w =  P.p31 * X + P.p32 * Y + P.p33 * Z + P.p34;
 		var u = (P.p11 * X + P.p12 * Y + P.p13 * Z + P.p14) / w;
@@ -468,14 +470,27 @@
 		return { u: u, v: v, w: w };
 	}
 	function getCameraCenterFromProjectionMatrix(P) {
+		// The camera center C is the one world point that projects to every screen point at once
+		// (the singularity of the projection), i.e. the unique solution of the top 3x3 of P times
+		// C equals the negated last column. We need this for the occlusion test in
+		// getEnemyUnitsOnScreen(): comparing "distance from camera" is meaningless without knowing
+		// where the camera actually is, and there's no api.camera getter for it directly.
 		var A = [[P.p11, P.p12, P.p13], [P.p21, P.p22, P.p23], [P.p31, P.p32, P.p33]];
 		var b = [-P.p14, -P.p24, -P.p34];
 		return solveLinearSystem(A, b);
 	}
+	// specFilterFun (optional): a unitSpec predicate like isCombat/isFactory above, applied at the
+	// getArmyUnitIds() stage so we skip fetching state for enemy units we don't even care about
+	// (e.g. pass isCombat to ignore enemy fabbers/structures before doing any projection math).
 	function getEnemyUnitsOnScreen(specFilterFun) {
 		var planetId = currentFocusPlanetId();
 		var W = window.innerWidth * devicePixelRatio;
 		var H = window.innerHeight * devicePixelRatio;
+
+		// 9x9 grid, inset 5% from each edge: sampling right at the viewport edge raises the miss
+		// rate (the ray more easily skims past the planet into empty space, especially when the
+		// planet doesn't fill the screen), which just means fewer usable correspondences below -
+		// insetting trades a little coverage for a much more reliable calibration.
 		var gridCols = 9, gridRows = 9;
 		var samplePoints = [];
 		for (var i = 0; i < gridCols; i++) {
@@ -487,6 +502,9 @@
 			}
 		}
 
+		// raycastTerrain returns a jQuery-style thenable (not a native Promise), which has no
+		// .catch() - use the two-argument .then(onFulfilled, onRejected) form everywhere below
+		// instead, or Promise.all() would throw trying to chain .catch() off it.
 		return Promise.all(samplePoints.map(function (pt) {
 			return model.holodeck.raycastTerrain(pt.u, pt.v).then(function (loc3D) {
 				if (!loc3D || !loc3D.pos) return null;
@@ -495,7 +513,7 @@
 			}, function () { return null; });
 		})).then(function (results) {
 			var valid = results.filter(Boolean);
-			if (valid.length < 6) return []; // camera isn't looking at this planet's terrain, can't calibrate
+			if (valid.length < 6) return []; // camera isn't looking at this planet's terrain, can't calibrate (need >=6 correspondences to solve the 11 unknowns in P)
 
 			var P = calibrateProjectionMatrix(valid);
 			var camCenter = getCameraCenterFromProjectionMatrix(P);
@@ -512,6 +530,8 @@
 				if (!enemyIds.length) return [];
 
 				return api.getWorldView(0).getUnitState(enemyIds).then(function (unitStates) {
+					// frustum test first (cheap: pure math, no engine call) to cut down how many
+					// units need the expensive occlusion raycast below
 					var candidates = [];
 					unitStates.forEach(function (unitState, i) {
 						var proj = projectWorldToScreen(P, unitState.pos);
@@ -524,6 +544,10 @@
 					});
 					if (!candidates.length) return [];
 
+					// being inside the frustum isn't enough on a spherical planet: a unit on the far
+					// side of the horizon still projects to valid screen coordinates. Detect that by
+					// raycasting terrain at the candidate's own projected (u,v): if the terrain there
+					// is closer to the camera than the candidate, the planet's own bulk is in the way.
 					return Promise.all(candidates.map(function (candidate) {
 						return model.holodeck.raycastTerrain(candidate.proj.u, candidate.proj.v).then(function (loc3D) {
 							return { candidate: candidate, terrainHit: loc3D };
@@ -856,6 +880,9 @@
 			var aaTargetIds = enemies.filter(isAntiAir).map(toId);
 			var otherTargetIds = enemies.filter(isNotAntiAir).map(toId);
 
+			// each bomber gets its own independently-shuffled queue (not one shared shuffle for all
+			// bombers) so they spread their first shots across different targets instead of every
+			// bomber piling onto the same one, while still keeping the AA-before-everything-else priority.
 			bomberIds.forEach(function (bomberId) {
 				var targetIds = _.shuffle(aaTargetIds).concat(_.shuffle(otherTargetIds));
 				targetIds.forEach(function (targetId, i) {
@@ -863,7 +890,7 @@
 						units: bomberId,
 						command: "attack",
 						location: { planet: planetId, entity: targetId },
-						queue: i > 0,
+						queue: i > 0, // first order (i === 0) replaces any existing queue, the rest append to it
 					});
 				});
 			});
@@ -955,6 +982,11 @@
 	function isNotBeingBuilt(unitState) { return !unitState.parent }
 	function hasOrders(unitState) { return unitState.orders && !unitState.parent } // && !unitState.parent filters out units that are currently being built && that are being transported
 	function hasNoOrders(unitState) { return !unitState.orders && !unitState.parent }
+	// matchState: when true, the returned predicate takes a unitState (e.g. from getUnitState() or
+	// getEnemyUnitsOnScreen()) and reads unitState.unit_spec.shortTypes, instead of taking a bare
+	// unitSpec and reading unitSpec.shortTypes directly. Needed because getEnemyUnitsOnScreen()
+	// already hands back full unit states (it fetched them anyway for position), so filters built
+	// from unitTypeMatch(..., true) can run straight over that array without an extra map step.
 	function unitTypeMatch(typeExpression, matchState) {
 		var orArr = typeExpression.split("|").filter(Boolean).map(function (andArr) {
 			return andArr.split(" ").filter(Boolean).map(function (unitType) {
