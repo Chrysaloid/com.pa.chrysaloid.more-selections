@@ -855,8 +855,36 @@
 
 	// =================   Micro managing bombers   ====================
 
-	var isAntiAir = unitTypeMatch("AirDefense -Orbital -Air", true);
-	var isNotAntiAir = unitTypeMatch("Mobile -AirDefense -Orbital -Air", true);
+	var antiAirUnits = {
+		"Flak Cannon"  : true,
+		"Galata Turret": true,
+		"Gil-E"        : true,
+		"Narwhal"      : true,
+		"Spinner"      : true,
+		"Stinger"      : true,
+		"Stingray"     : true,
+		"Storm"        : true,
+		"Stryker"      : true,
+		"Typhoon"      : true,
+	}
+	function filterUnitsByNames(unitObj) {
+		return function (unitState) { return unitObj[unitState.unit_spec.normalName] }
+	}
+	var isNotAirNotOrbitalSpec = unitTypeMatch("-Orbital -Air | Air Factory");
+	var isCombatNotAntiAirState = unitTypeMatch("Mobile -AirDefense -Fabber -Scout", true);
+	var isFabberState = unitTypeMatch("Fabber", true);
+	var isFactoryState = unitTypeMatch("Factory", true);
+	var isStructureState = unitTypeMatch("Structure", true);
+	var isScoutState = unitTypeMatch("Scout", true);
+
+	var bumblebeeTargetFilterFuns = [
+		filterUnitsByNames(antiAirUnits),
+		isCombatNotAntiAirState,
+		isFabberState,
+		isFactoryState,
+		isStructureState,
+		isScoutState,
+	]
 	model.selected_bumblebees_attack_enemies_on_screen = function() {
 		var selection = getSelectionOrHover();
 		if (!selection) return;
@@ -871,21 +899,21 @@
 		var planetId = currentFocusPlanetId();
 		var worldView = api.getWorldView(0);
 
-		return getEnemyUnitsOnScreen().then(function (enemies) {
+		return getEnemyUnitsOnScreen(isNotAirNotOrbitalSpec).then(function (enemies) {
 			if (!enemies.length) {
-				logChatMessage("No enemy units visible on screen");
+				logChatMessage("No enemy units (viable for attack) visible on screen");
 				return;
 			}
 
-			var aaTargetIds = enemies.filter(isAntiAir).map(toId);
-			var otherTargetIds = enemies.filter(isNotAntiAir).map(toId);
+			var enemiesArr = bumblebeeTargetFilterFuns.map(function (filterFun) {
+				return enemies.filter(filterFun).map(toId);
+			});
 
 			// each bomber gets its own independently-shuffled queue (not one shared shuffle for all
 			// bombers) so they spread their first shots across different targets instead of every
 			// bomber piling onto the same one, while still keeping the AA-before-everything-else priority.
 			bomberIds.forEach(function (bomberId) {
-				var targetIds = _.shuffle(aaTargetIds).concat(_.shuffle(otherTargetIds));
-				targetIds.forEach(function (targetId, i) {
+				_.unique(_.flatten(enemiesArr.map(_.shuffle))).forEach(function (targetId, i) {
 					worldView.sendOrder({
 						units: bomberId,
 						command: "attack",
@@ -1048,7 +1076,7 @@
 			_.unique(
 				_.values(model.unitSpecs)
 				.filter(unitTypeMatch(typeExpression))
-				.map(function(unitSpec) { return unitSpec.name.replace("!LOC:", "") })
+				.map(function(unitSpec) { return unitSpec.normalName })
 			).sortValuesSimple().join("\n")
 		);
 	}
